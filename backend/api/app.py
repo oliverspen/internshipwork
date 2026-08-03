@@ -1,5 +1,7 @@
 """FastAPI application entry point."""
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Response
@@ -29,8 +31,14 @@ app.mount("/results", StaticFiles(directory=str(_results_dir)), name="results")
 
 # Serve pyvis dependencies (vis-network, tom-select, bindings) used by saved HTML maps.
 _lib_dir = Path(__file__).resolve().parents[2] / "lib"
-if _lib_dir.exists():
-    app.mount("/lib", StaticFiles(directory=str(_lib_dir)), name="lib")
+if _lib_dir.is_dir() and os.access(_lib_dir, os.R_OK):
+    try:
+        app.mount("/lib", StaticFiles(directory=str(_lib_dir)), name="lib")
+    except PermissionError:
+        print(f"WARNING: unable to mount /lib because {str(_lib_dir)} is not readable")
+else:
+    if _lib_dir.exists():
+        print(f"WARNING: unable to mount /lib because {str(_lib_dir)} is not a readable directory")
 
 # Serve the frontend.
 _static_dir = Path(__file__).resolve().parents[2] / "frontend" / "static"

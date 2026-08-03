@@ -1,0 +1,52 @@
+[project]
+name = "myproject"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "acidwatch>=0.4.0",
+    "asyncio>=4.0.0",
+    "cantera>=3.2.0",
+    "coolprop>=8.0.0",
+    "ipykernel>=7.3.0",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.11.0",
+    "neqsim>=3.16.0",
+    "networkx>=3.6.1",
+    "numpy>=2.5.0",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.3",
+    "poetry>=2.4.1",
+    "pychemkin>=1.1.8",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pyvis>=0.3.2",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=backend --cov-report=term-missing:skip-covered"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["backend"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+omit = [
+    "backend/__init__.py",
+    "backend/**/__init__.py",
+    "backend/merge_support/__main__.py",
+    "backend/api/**",
+    "backend/pipemapping.py",
+    "backend/pipemapping/dev_pipeline_map.py",
+    "backend/pipemapping/dialogs.py",
+    "backend/output/html_export.py",
+    "backend/output/png_export.py",
+    "backend/variables.py",
+]
+

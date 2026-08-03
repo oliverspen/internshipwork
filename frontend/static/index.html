@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipeline Simulation</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Pipeline Simulation</h1>
+    <p>TOCOMO &amp; PH_PITZ reactive chemistry — run simulations and browse results</p>
+  </div>
+</header>
+
+<main>
+  <!-- ── Controls panel ── -->
+  <div class="vars-panel">
+    <div class="card">
+      <h2>Model</h2>
+      <p class="vars-box-note">Choose the simulation model first.</p>
+      <select id="model-sel" style="margin-bottom:0">
+        <option value="tocomo">TOCOMO</option>
+        <option value="phpitz">PH_PITZ Reactive</option>
+        <option value="tocomo_dynamic">TOCOMO Dynamic</option>
+        <option value="phpitz_dynamic">PH_PITZ Dynamic</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <h2>Run Simulation</h2>
+
+      <button class="btn btn-edit-vars-large" onclick="openConfigEditor()">Edit Variables</button>
+
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem;">
+        <label for="map-sel" style="margin:0">Pipeline Map</label>
+        <button class="btn btn-sm" onclick="openMapBuilder()" style="font-size:.75rem;padding:.2rem .55rem;">&#43; New</button>
+      </div>
+      <select id="map-sel"><option value="">Loading…</option></select>
+
+      <div id="dynamic-run-settings" style="display:none;margin-top:.65rem;padding:.6rem;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+        <div style="font-size:.78rem;color:#4a5568;margin-bottom:.45rem;">Dynamic Simulation Settings</div>
+        <div class="field-row">
+          <label><span>Time step (days)</span>
+            <input id="dynamic-dt-days" type="number" step="any" min="0.000001" value="0.01">
+          </label>
+          <label><span>Total duration (days)</span>
+            <input id="dynamic-duration-days" type="number" step="any" min="0.000001" value="2">
+          </label>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-start;margin-top:.55rem;gap:.35rem;">
+          <button class="btn btn-sm" type="button" onclick="openDynamicChangesEditor()" style="min-width:220px;padding:.5rem 1rem;">Enter Changed Variables</button>
+          <span id="dynamic-change-summary" style="font-size:.75rem;color:#4a5568;">No dynamic changes configured</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="run-btn" onclick="runSimulation()">▶ Run</button>
+      <div id="run-progress" class="run-progress" aria-live="polite" style="display:none">
+        <div id="run-progress-pct" class="run-progress-pct">0%</div>
+        <div class="run-progress-track">
+          <div id="run-progress-fill" class="run-progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="status" id="run-status"></div>
+    </div>
+
+    <div class="card">
+      <h2>Results</h2>
+      <div id="results-links-list" class="results-links-list">
+        <div class="empty">No saved results yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main panel ── -->
+  <div class="result-area">
+
+    <div class="card">
+      <h2 id="map-panel-title">Interactive Pipeline Map</h2>
+      <div class="empty" id="map-placeholder">Run a simulation to see the interactive map here.</div>
+      <iframe id="map-frame" title="Pipeline map"></iframe>
+    </div>
+
+    <div class="card" id="results-card" style="display:none">
+      <h2 class="results-title-inline">
+        Results Summary
+        <button id="results-filter-toggle" class="btn btn-sm" type="button" onclick="toggleResultsFilterPanel()" aria-expanded="false">Filter Parameters</button>
+      </h2>
+      <div id="results-controls" class="results-controls" style="display:none;">
+        <div id="results-column-picker" class="results-column-picker"></div>
+      </div>
+      <table>
+        <thead id="results-thead"></thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</main>
+
+<script src="/static/app.js"></script>
+
+<!-- ── Config Editor Modal ── -->
+<div id="config-modal" class="modal">
+  <div class="modal-box wide">
+    <div class="modal-header">
+      <h2>Edit Variables</h2>
+      <button class="btn-close" onclick="closeModal('config-modal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="section-label">System Pressure</div>
+      <div class="field-row">
+        <label style="max-width:180px"><span>Pressure (bar-a)</span>
+          <input id="cfg-p-bara" type="number" step="any">
+        </label>
+        <label style="max-width:260px"><span>Storage Node Name</span>
+          <input id="cfg-storage-name" type="text" placeholder="e.g. Zeebrugge">
+        </label>
+      </div>
+
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Plants</span>
+        <button class="btn btn-sm" onclick="addPlant()">&#43; Add</button>
+      </div>
+      <div id="cfg-contaminant-controls"></div>
+      <div id="cfg-plants"></div>
+
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Merge Nodes</span>
+        <button class="btn btn-sm" onclick="addMergeOption()">&#43; Add</button>
+      </div>
+      <div id="cfg-merges"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" style="background:#edf2f7" onclick="closeModal('config-modal')">Cancel</button>
+      <button class="btn btn-primary" style="width:auto" onclick="saveConfig()">&#10003; Save Config</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Map Variables Modal ── -->
+<div id="map-vars-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Selected Map Variables</h2>
+      <button class="btn-close" onclick="closeModal('map-vars-modal')">&#10005;</button>
+    </div>
+    <div class="modal-body" id="map-vars-content"></div>
+    <div class="modal-footer">
+      <button class="btn" style="background:#edf2f7" onclick="closeModal('map-vars-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Map Modal ── -->
+<div id="map-modal" class="modal">
+  <div class="modal-box wide">
+    <div class="modal-header">
+      <h2>Create Pipeline Map</h2>
+      <button class="btn-close" onclick="closeModal('map-modal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-builder-layout">
+        <div class="mb-builder-form">
+          <div class="wizard-steps">
+            <div class="wizard-step active" id="wstep1">1 · Plants</div>
+            <div class="wizard-step" id="wstep2">2 · Merges</div>
+            <div class="wizard-step" id="wstep3">3 · Finalize</div>
+          </div>
+          <div class="wizard-panel active" id="mb-step1"></div>
+          <div class="wizard-panel" id="mb-step2"></div>
+          <div class="wizard-panel" id="mb-step3"></div>
+        </div>
+        <div class="mb-builder-review">
+          <div class="section-label" style="margin-top:0">Map Review</div>
+          <div id="mb-review" class="mb-review-canvas"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" style="background:#edf2f7" onclick="closeModal('map-modal')">Cancel</button>
+      <button class="btn" style="background:#edf2f7" id="mb-back-btn" onclick="goMBBack()" style="display:none">&#8592; Back</button>
+      <button class="btn btn-primary" style="width:auto" id="mb-next-btn" onclick="goMBNext()">Next &#8594;</button>
+      <button class="btn btn-primary" style="width:auto;display:none" id="mb-save-btn" onclick="saveMBMap()">&#10003; Save Map</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Dynamic Changes Modal ── -->
+<div id="dynamic-vars-modal" class="modal">
+  <div class="modal-box wide">
+    <div class="modal-header">
+      <h2>Dynamic Variable Changes</h2>
+      <button class="btn-close" onclick="closeModal('dynamic-vars-modal')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="section-label" style="margin-top:0">Choose variable changes to simulate</div>
+      <div id="dynamic-vars-rows"></div>
+      <div style="margin-top:.7rem;display:flex;gap:.45rem;flex-wrap:wrap;">
+        <button class="btn btn-sm" type="button" onclick="clearDynamicChangeRows()">Clear All</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" style="background:#edf2f7" onclick="closeModal('dynamic-vars-modal')">Close</button>
+      <button class="btn btn-primary" style="width:auto" onclick="saveDynamicChanges()">Use These Changes</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

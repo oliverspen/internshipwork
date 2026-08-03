@@ -1,0 +1,42 @@
+{
+  "p_bara": 10.0,
+  "plant_inputs": [
+    {
+      "name": "Place A",
+      "inlet_conc": {
+        "O2": 4.0,
+        "H2O": 3.0,
+        "H2S": 1.0,
+        "SO2": 2.0,
+        "NO2": 3.0
+      },
+      "stream_phase": "liquid",
+      "flowrate": 50000.0,
+      "temperature_celsius": -43.0,
+      "pipelength": 14000.0,
+      "pipediameter": 0.5
+    },
+    {
+      "name": "Place B",
+      "inlet_conc": {
+        "O2": 1.0,
+        "H2O": 5.0,
+        "H2S": 3.0,
+        "SO2": 2.0,
+        "NO2": 2.0
+      },
+      "stream_phase": "liquid",
+      "flowrate": 30000.0,
+      "temperature_celsius": -40.0,
+      "pipelength": 37000.0,
+      "pipediameter": 0.9
+    }
+  ],
+  "merge_pipe_inputs": {
+    "Merge1": {
+      "pipelength": 48000.0,
+      "pipediameter": 0.5
+  }
+},
+  "storage_name": "Storage"
+}

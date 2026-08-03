@@ -15,7 +15,7 @@ import webbrowser
 
 # App shell mode for web workflow.
 APP_MODE = "fullstack"  # "fullstack", "backend", "frontend", "legacy"
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 PORT = 8000
 RELOAD = True
 OPEN_BROWSER_ON_START = True

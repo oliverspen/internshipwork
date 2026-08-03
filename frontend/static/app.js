@@ -1752,7 +1752,13 @@ function _renderResultCell(col, row) {
   const raw = typeof col.getter === 'function' ? col.getter(row) : _getResultPathValue(row, col.key);
   if (raw == null || raw === '') return '—';
   if (typeof raw === 'string') return _esc(raw);
-  if (typeof raw === 'number') return _formatNumericCell(raw);
+  if (typeof raw === 'number') {
+    const key = String(col.key || '');
+    if (key.startsWith('tocomo_input.') || key.startsWith('final.')) {
+      return Number.isFinite(raw) ? raw.toFixed(2) : _esc(String(raw));
+    }
+    return _formatNumericCell(raw);
+  }
   if (typeof raw === 'boolean') return raw ? 'true' : 'false';
   if (Array.isArray(raw) || _isPlainObject(raw)) return _esc(JSON.stringify(raw));
   return _esc(String(raw));

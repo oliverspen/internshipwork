@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 
-from .utils import build_excel_rows, build_storage_row
+from .utils import build_excel_rows, build_storage_row, _round_conc
 from backend.user_inputs import get_input_config
 
 
@@ -114,8 +114,7 @@ def save_dynamic_excel(
                     final_dict = result.get("final", {})
                     if isinstance(final_dict, dict):
                         for species, value in sorted(final_dict.items()):
-                            row[f"final_{species}"] = value
-                    storage_data.append(row)
+                            row[f"final_{species}"] = _round_conc(value)
 
                 if storage_data:
                     storage_df = pd.DataFrame(storage_data).sort_values("time_days")
@@ -140,13 +139,12 @@ def save_dynamic_excel(
                     }
                     for key, value in sorted(result.items()):
                         if key.startswith("inlet_"):
-                            row[key] = value
+                            row[key] = _round_conc(value)
                     # Include final contaminant concentrations if available
                     final_dict = result.get("final", {})
                     if isinstance(final_dict, dict):
                         for species, value in sorted(final_dict.items()):
-                            row[f"final_{species}"] = value
-                    plant_data.append(row)
+                            row[f"final_{species}"] = _round_conc(value)
 
                 plant_df = pd.DataFrame(plant_data)
                 sheet_name = f"Plant_{plant_name}"[:31]
@@ -172,13 +170,12 @@ def save_dynamic_excel(
                     # Add inlet contaminant concentrations
                     for key, value in sorted(result.items()):
                         if key.startswith("inlet_"):
-                            row[key] = value
+                            row[key] = _round_conc(value)
                     # Add final contaminant concentrations
                     final_dict = result.get("final", {})
                     if isinstance(final_dict, dict):
                         for species, value in sorted(final_dict.items()):
-                            row[f"final_{species}"] = value
-                    merge_data.append(row)
+                            row[f"final_{species}"] = _round_conc(value)
 
                 merge_df = pd.DataFrame(merge_data)
                 sheet_name = f"Merge_{merge_name}"[:31]

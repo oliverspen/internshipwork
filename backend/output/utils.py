@@ -13,6 +13,14 @@ def _celsius_from_kelvin(value: Any) -> float | None:
         return None
 
 
+def _round_conc(value: Any) -> float | None:
+    """Round a concentration to 2 decimal places."""
+    try:
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return None
+
+
 def infer_allowed_input_species(results: list[dict[str, Any]]) -> list[str]:
     """Infer model-supported input species that have at least one non-zero value."""
     totals: dict[str, float] = {}
@@ -113,9 +121,9 @@ def build_excel_rows(
         is_storage = str(row.get("source_type", "")) == "storage"
         output_source = tocomo_input if is_storage else final_values
         for species in input_species:
-            record[f"inlet_{species} (molar ppm)"] = tocomo_input.get(species)
+            record[f"inlet_{species} (molar ppm)"] = _round_conc(tocomo_input.get(species))
         for species in output_species:
-            record[f"predicted_{species} (molar ppm)"] = output_source.get(species)
+            record[f"predicted_{species} (molar ppm)"] = _round_conc(output_source.get(species))
         rows.append(record)
     return rows
 
@@ -135,7 +143,7 @@ def build_storage_row(storage_results: list[dict[str, Any]]) -> list[dict[str, A
         for species in sorted(composition):
             value = composition[species]
             if float(value or 0) != 0.0:
-                record[f"inlet_{species} (molar ppm)"] = value
+                record[f"inlet_{species} (molar ppm)"] = _round_conc(value)
         rows.append(record)
     return rows
 

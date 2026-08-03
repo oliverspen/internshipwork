@@ -269,9 +269,8 @@ def save_interactive_html_map(
         )
 
     output = Path(output_path)
-    net.write_html(str(output))
-
-    html_content = output.read_text(encoding="utf-8")
+    # generate_html() avoids pyvis trying to os.makedirs("lib") in a read-only CWD
+    html_content = net.generate_html()
     html_content = html_content.replace(' src="lib/', ' src="/lib/').replace(' href="lib/', ' href="/lib/')
 
     map_title = str(pipeline_map_name or "Pipeline map").strip() or "Pipeline map"

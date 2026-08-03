@@ -2,6 +2,7 @@
 
 import os
 
+import pyvis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Response
@@ -39,6 +40,15 @@ if _lib_dir.is_dir() and os.access(_lib_dir, os.R_OK):
 else:
     if _lib_dir.exists():
         print(f"WARNING: unable to mount /lib because {str(_lib_dir)} is not a readable directory")
+    else:
+        pyvis_lib_dir = Path(pyvis.__file__).resolve().parent / "lib"
+        if pyvis_lib_dir.is_dir() and os.access(pyvis_lib_dir, os.R_OK):
+            try:
+                app.mount("/lib", StaticFiles(directory=str(pyvis_lib_dir)), name="lib")
+            except PermissionError:
+                print(f"WARNING: unable to mount /lib because {str(pyvis_lib_dir)} is not readable")
+        else:
+            print(f"WARNING: unable to mount /lib because pyvis lib directory {str(pyvis_lib_dir)} is unavailable")
 
 # Serve the frontend.
 _static_dir = Path(__file__).resolve().parents[2] / "frontend" / "static"

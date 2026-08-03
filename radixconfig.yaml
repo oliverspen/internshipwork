@@ -1,7 +1,7 @@
 apiVersion: radix.equinor.com/v1
 kind: RadixApplication
 metadata:
-  name: oliver
+  name: oliver-stream-mix
 spec:
   environments:
     - name: dev

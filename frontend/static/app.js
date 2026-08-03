@@ -263,7 +263,7 @@ async function onMapSelectionChange() {
 
   try {
     const [mapData, cfg] = await Promise.all([
-      api(`/api/maps/${mapName}`),
+      api(`/api/maps/${encodeURIComponent(mapName)}`),
       api('/api/config/'),
     ]);
     const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
@@ -325,7 +325,7 @@ async function runSimulation() {
 
   try {
     const [mapData, cfg] = await Promise.all([
-      api(`/api/maps/${mapName}`),
+      api(`/api/maps/${encodeURIComponent(mapName)}`),
       api('/api/config/'),
     ]);
     const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
@@ -700,7 +700,7 @@ async function _run(model, mapName) {
       hideResultsSummary();
     } else {
       const [mapData, cfg] = await Promise.all([
-        api(`/api/maps/${mapName}`),
+        api(`/api/maps/${encodeURIComponent(mapName)}`),
         api('/api/config/'),
       ]);
       const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
@@ -1617,7 +1617,7 @@ async function previewSelectedMap() {
   }
   try {
     const [mapData, cfg] = await Promise.all([
-      api(`/api/maps/${mapName}`),
+      api(`/api/maps/${encodeURIComponent(mapName)}`),
       api('/api/config/'),
     ]);
     const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];

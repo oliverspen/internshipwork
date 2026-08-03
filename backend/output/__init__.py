@@ -7,11 +7,20 @@ All outputs are organized into timestamped subdirectories within outputs/tocomo/
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+import re
 
 import networkx as nx
 
 from .excel_export import save_summary_excel
 from .html_export import save_interactive_html_map
+
+_NORWEGIAN = str.maketrans({'æ': 'ae', 'Æ': 'ae', 'ø': 'oe', 'Ø': 'oe', 'å': 'aa', 'Å': 'aa'})
+
+
+def _slugify(name: str) -> str:
+    """Convert a display name to a filesystem-safe ASCII slug."""
+    transliterated = name.translate(_NORWEGIAN)
+    return re.sub(r'[^A-Za-z0-9_-]+', '_', transliterated.strip().lower()).strip('_') or 'unnamed'
 
 
 def _save_model_results(
@@ -45,9 +54,7 @@ def _save_model_results(
     """
     # Create timestamped output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_map_name = (
-        pipeline_map_name.lower().replace(" ", "_") if pipeline_map_name else "unnamed"
-    )
+    safe_map_name = _slugify(pipeline_map_name) if pipeline_map_name else 'unnamed'
     output_dir = (Path(__file__).resolve().parents[2] / "results" / model_folder).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     session_dir = (output_dir / f"{timestamp}_{safe_map_name}").resolve()

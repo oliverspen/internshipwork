@@ -1,11 +1,21 @@
 """Excel export for TOCOMO results."""
 
+import re
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from .utils import build_excel_rows, build_storage_row, _round_conc
+
+# Excel forbids these characters in sheet names
+_EXCEL_FORBIDDEN = re.compile(r'[\[\]:*?/\\]')
+
+
+def _safe_sheet_name(prefix: str, name: str) -> str:
+    """Build an Excel sheet name with forbidden chars removed, max 31 chars."""
+    sanitized = _EXCEL_FORBIDDEN.sub('_', f"{prefix}{name}")
+    return sanitized[:31]
 from backend.user_inputs import get_input_config
 
 
@@ -147,7 +157,7 @@ def save_dynamic_excel(
                             row[f"final_{species}"] = _round_conc(value)
 
                 plant_df = pd.DataFrame(plant_data)
-                sheet_name = f"Plant_{plant_name}"[:31]
+                sheet_name = _safe_sheet_name('Plant_', str(plant_name))
                 plant_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
         # 3. Write separate table for each merge
@@ -178,7 +188,7 @@ def save_dynamic_excel(
                             row[f"final_{species}"] = _round_conc(value)
 
                 merge_df = pd.DataFrame(merge_data)
-                sheet_name = f"Merge_{merge_name}"[:31]
+                sheet_name = _safe_sheet_name('Merge_', str(merge_name))
                 merge_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
     return excel_path

@@ -35,6 +35,9 @@ from backend.user_inputs import INPUT_CONFIG_PATH, build_input_config, get_input
 from backend.merge_support.topology import build_merge_definitions
 
 
+_NORWEGIAN = str.maketrans({'æ': 'ae', 'Æ': 'ae', 'ø': 'oe', 'Ø': 'oe', 'å': 'aa', 'Å': 'aa'})
+
+
 def _normalize_map_name(raw_name: str) -> str:
     """Normalize user-provided map name to valid identifier format.
     
@@ -46,7 +49,8 @@ def _normalize_map_name(raw_name: str) -> str:
     Returns:
         Normalized name suitable for use as a config identifier
     """
-    normalized = re.sub(r"[^A-Za-z0-9_-]+", "_", raw_name.strip().lower())
+    transliterated = raw_name.translate(_NORWEGIAN)
+    normalized = re.sub(r"[^A-Za-z0-9_-]+", "_", transliterated.strip().lower())
     normalized = normalized.strip("_")
     return normalized or "pipeline_map"
 

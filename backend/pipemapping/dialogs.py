@@ -22,25 +22,8 @@ def init_dialog_root() -> None:
     global ROOT
     if ROOT is None:
         ROOT = tk.Tk()
-
-        # Configure standard Tkinter fonts for consistent appearance
         default_font = tkfont.nametofont("TkDefaultFont")
-        default_font.configure(family="Segoe UI", size=12)
-
-        text_font = tkfont.nametofont("TkTextFont")
-        text_font.configure(family="Segoe UI", size=12)
-
-        fixed_font = tkfont.nametofont("TkFixedFont")
-        fixed_font.configure(family="Consolas", size=11)
-
-        heading_font = tkfont.nametofont("TkHeadingFont")
-        heading_font.configure(family="Segoe UI", size=13)
-
-        menu_font = tkfont.nametofont("TkMenuFont")
-        menu_font.configure(family="Segoe UI", size=11)
-
-        caption_font = tkfont.nametofont("TkCaptionFont")
-        caption_font.configure(family="Segoe UI", size=11)
+        default_font.configure(size=12)
 
         ROOT.withdraw()
 
@@ -60,9 +43,8 @@ def prepare_dialog(dialog: tk.Toplevel, width: int, height: int) -> None:
     global DIALOG_ORIGIN
 
     if DIALOG_ORIGIN is None:
-        # Calculate center position once and reuse for all dialogs
-        screen_w = ROOT.winfo_screenwidth() if ROOT is not None else 1920
-        screen_h = ROOT.winfo_screenheight() if ROOT is not None else 1080
+        screen_w = ROOT.winfo_screenwidth()
+        screen_h = ROOT.winfo_screenheight()
         x = max(20, (screen_w - width) // 2)
         y = max(20, (screen_h - height) // 2)
         DIALOG_ORIGIN = (x, y)
@@ -81,11 +63,8 @@ def show_modal_dialog(dialog: tk.Toplevel, focus_widget: tk.Widget | None = None
         dialog: The Toplevel window to show modally
         focus_widget: Optional widget to focus after dialog becomes active
     """
-    # Modal setup prevents user from interacting with older dialogs out of order
     dialog.update_idletasks()
     dialog.lift()
-    dialog.attributes("-topmost", True)
-    dialog.after(100, lambda: dialog.attributes("-topmost", False))
     dialog.wait_visibility()
     dialog.grab_set()
     if focus_widget is not None:

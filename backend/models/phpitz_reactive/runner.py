@@ -1,6 +1,5 @@
 """High-level PH_PITZ reactive run orchestration."""
 
-from pathlib import Path
 from typing import Any
 from typing import Callable
 
@@ -122,7 +121,6 @@ def run_reaction(
         input_concentrations = to_phpitz_reactive_input_from_source_state(source_state)
         display_name = plant_names.get(source_name, source_name) if source_type == "plant" else source_name
         source_label = f"{source_type} {display_name}"
-        print(f"  [{source_label}] phase={source_state.get('stream_phase', 'unknown')}, density={float(source_state.get('density_kg_per_m3', 0.0)):.3f} kg/m³")
 
         temperature_kelvin = float(source_state.get("temperature_kelvin", 298.15))
         final_values = post_model(
@@ -162,20 +160,13 @@ def run_reaction(
             storage_name=storage_name,
         )
 
-        session_dir = save_phpitz_reactive_results(
+        save_phpitz_reactive_results(
             results,
             pipeline_map_name=str(pipeline_map_name) if pipeline_map_name is not None else None,
             graph=graph,
             node_types=node_types,
             plant_names=plant_names,
         )
-        session_path = Path(session_dir)
-        html_files = list(session_path.glob("*_map.html"))
-        print(f"Results saved to: {session_path}")
-        if html_files:
-            print(f"Pipeline map:     {html_files[0].name}")
-    else:
-        print("PH_PITZ reactive result export disabled (save_results=False).")
 
     if progress_callback and total_sources > 0:
         progress_callback(total_sources, total_sources, "Completed")

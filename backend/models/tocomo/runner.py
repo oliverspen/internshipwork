@@ -1,7 +1,5 @@
 """High-level TOCOMO run orchestration."""
 
-from pathlib import Path
-from pprint import pprint
 from typing import Callable
 
 from backend.output import save_tocomo_results
@@ -108,13 +106,6 @@ def run_reaction(
         # Convert current source state to backend-ready TOCOMO input.
         input_concentrations = to_tocomo_input_from_source_state(source_state)
         source_label = f"{source_type} {source_name}"
-        print(
-            "Running TOCOMO for {label}: phase={phase}, density={density:.5f} kg/m^3".format(
-                label=source_label,
-                phase=source_state.get("stream_phase", "unknown"),
-                density=float(source_state.get("density_kg_per_m3", 0.0)),
-            )
-        )
 
         temperature_kelvin = float(source_state.get("temperature_kelvin", 298.15))
         final_values = post_model(
@@ -145,9 +136,6 @@ def run_reaction(
         if storage_row:
             results.append(storage_row)
 
-    print("TOCOMO final values:")
-    pprint(results)
-
     if save_results:
         # Gather naming/topology metadata for JSON/Excel/HTML export.
         input_config = get_input_config()
@@ -164,26 +152,14 @@ def run_reaction(
             storage_name=storage_name,
         )
 
-        # Persist session outputs and print generated artifact paths.
-        session_dir = save_tocomo_results(
+        # Persist session outputs when file export is enabled.
+        save_tocomo_results(
             results,
             pipeline_map_name=str(pipeline_map_name) if pipeline_map_name is not None else None,
             graph=graph,
             node_types=node_types,
             plant_names=plant_names,
         )
-        session_path = Path(session_dir)
-        summary_excel = session_path / "summary.xlsx"
-        print(f"Saved TOCOMO summary Excel:  {summary_excel}")
-        print(f"Per-source files saved in:   {session_path}")
-        png_files = list(session_path.glob("*_map.png"))
-        html_files = list(session_path.glob("*_map.html"))
-        if png_files:
-            print(f"Saved annotated pipeline map (PNG):  {png_files[0]}")
-        if html_files:
-            print(f"Saved interactive pipeline map (HTML): {html_files[0]}")
-    else:
-        print("TOCOMO result export disabled (save_results=False).")
 
     if progress_callback and total_sources > 0:
         progress_callback(total_sources, total_sources, "Completed")

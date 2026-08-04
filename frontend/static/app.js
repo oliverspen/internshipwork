@@ -2062,7 +2062,7 @@ function renderConfigEditor() {
 
   const extraControlsHtml = allowExtras
     ? `<div style="font-size:.78rem;color:#4a5568;margin:.1rem 0 .8rem;">PH_PITZ is active. You can add contaminants from each plant inlet section.</div>`
-    : `<div style="font-size:.78rem;color:#4a5568;margin:.1rem 0 .8rem;">Inlet concentrations shown here are limited to O2, H2O, H2S, SO2, and NO2.</div>`;
+    : `<div style="font-size:.78rem;color:#4a5568;margin:.1rem 0 .8rem;">Tocomo models are limited to O2, H2O, H2S, SO2, and NO2.</div>`;
 
   // Plants
   document.getElementById('cfg-plants').innerHTML = _cfg.plant_inputs.map((p, i) => `
@@ -2185,9 +2185,18 @@ function addMergeOption() {
   // Preserve unsaved edits from existing inputs before re-rendering the editor.
   collectConfig();
 
-  const name = prompt('Merge name (e.g. "Brussels"):');
-  if (!name?.trim()) return;
-  _cfg.merge_pipe_inputs[name.trim()] = { pipelength: 10000, pipediameter: 0.5 };
+  if (!_cfg.merge_pipe_inputs || typeof _cfg.merge_pipe_inputs !== 'object') {
+    _cfg.merge_pipe_inputs = {};
+  }
+
+  const existingNames = new Set(Object.keys(_cfg.merge_pipe_inputs));
+  let nextIndex = 1;
+  while (existingNames.has(`Merge ${nextIndex}`)) {
+    nextIndex += 1;
+  }
+
+  const placeholderName = `Merge ${nextIndex}`;
+  _cfg.merge_pipe_inputs[placeholderName] = { pipelength: 10000, pipediameter: 0.5 };
   renderMergeOptions();
 }
 

@@ -15,27 +15,6 @@ _runtime_input_config: ContextVar[dict[str, object] | None] = ContextVar(
 )
 
 
-def _normalize_plant_inputs(config_plant_inputs: list[dict[str, object]]) -> list[dict[str, object]]:
-    """Normalize plant inputs to canonical forms used across the backend."""
-    normalized_plant_inputs: list[dict[str, object]] = []
-    for plant_input in config_plant_inputs:
-        normalized_plant = deepcopy(plant_input)
-
-        inlet_conc = normalized_plant.get("inlet_conc")
-        if isinstance(inlet_conc, dict):
-            normalized_plant["inlet_conc"] = {
-                str(species).strip().upper(): value
-                for species, value in inlet_conc.items()
-            }
-
-        normalized_plant["stream_phase"] = str(
-            normalized_plant.get("stream_phase", "")
-        ).strip().lower()
-        normalized_plant_inputs.append(normalized_plant)
-
-    return normalized_plant_inputs
-
-
 def _validate_inputs(
     config_plant_inputs: list[dict[str, object]],
     config_merge_pipe_inputs: dict[str, dict[str, float]],
@@ -93,9 +72,7 @@ def build_input_config(
     config_storage_name: str | None = None,
 ) -> dict[str, object]:
     """Build one normalized input configuration dict."""
-    resolved_plant_inputs = _normalize_plant_inputs(
-        deepcopy(config_plant_inputs if config_plant_inputs is not None else plant_inputs)
-    )
+    resolved_plant_inputs = deepcopy(config_plant_inputs if config_plant_inputs is not None else plant_inputs)
     resolved_merge_pipe_inputs = deepcopy(
         config_merge_pipe_inputs if config_merge_pipe_inputs is not None else merge_pipe_inputs
     )
@@ -177,16 +154,14 @@ def _load_file_backed_inputs() -> None:
     loaded_p_bara = raw_config["p_bara"]
     loaded_storage_name = str(raw_config.get("storage_name", "Storage")).strip() or "Storage"
 
-    normalized_plant_inputs = _normalize_plant_inputs(loaded_plant_inputs)
-
     _validate_inputs(
-        normalized_plant_inputs,
+        loaded_plant_inputs,
         loaded_merge_pipe_inputs,
         loaded_p_bara,
         loaded_storage_name,
     )
 
-    plant_inputs = normalized_plant_inputs
+    plant_inputs = loaded_plant_inputs
     merge_pipe_inputs = loaded_merge_pipe_inputs
     p_bara = loaded_p_bara
     storage_name = loaded_storage_name

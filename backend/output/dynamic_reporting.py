@@ -9,7 +9,6 @@ Generates comprehensive reports for time-stepping TOCOMO simulations including:
 Main entry point: render_dynamic_reports() generates all tables and plots.
 """
 
-import logging
 import math
 from pathlib import Path
 from typing import Any
@@ -21,8 +20,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 
 def _infer_dt_days(dynamic_results: list[dict[str, Any]]) -> float:
@@ -288,18 +285,18 @@ def _print_dynamic_merge_table(dynamic_results: list[dict[str, Any]]) -> None:
         ],
     )
 
-    logger.info("Merge change points (grouped):")
+    print("Merge change points (grouped):")
     for merge_name, merge_group in merge_compact_table.groupby("merge_name", sort=False):
         merge_group = merge_group.sort_values("time_days")
         first_row = merge_group.iloc[0]
-        logger.info("")
-        logger.info("%s", merge_name)
+        print()
+        print(f"{merge_name}")
 
         table_cols = [
             "pipe_time_days",
         ]
         table_cols = [col for col in table_cols if col in merge_group.columns]
-        logger.info("\n%s", merge_group[table_cols].to_string(index=False))
+        print(merge_group[table_cols].to_string(index=False))
 
 
 def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
@@ -368,13 +365,13 @@ def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
         ],
     )
 
-    logger.info("")
-    logger.info("Plant change points (grouped):")
+    print()
+    print("Plant change points (grouped):")
     for plant_name, plant_group in plant_compact_table.groupby("plant_name", sort=False):
         plant_group = plant_group.sort_values("time_days")
         first_row = plant_group.iloc[0]
-        logger.info("")
-        logger.info("%s", plant_name)
+        print()
+        print(f"{plant_name}")
 
         table_cols = [
             "time_days",
@@ -390,7 +387,7 @@ def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
             "inlet_H2S",
         ]
         table_cols = [col for col in table_cols if col in plant_group.columns]
-        logger.info("\n%s", plant_group[table_cols].to_string(index=False))
+        print(plant_group[table_cols].to_string(index=False))
 
 
 def _format_change_annotation(previous: float, new: float, time_days: float) -> str:
@@ -633,7 +630,7 @@ def _plot_metric_dashboard(
 
     merge_table = _ensure_merge_metric_column(pd.DataFrame(dynamic_results), merge_value_col)
     if merge_value_col not in merge_table.columns:
-        logger.info("Skipping dashboard '%s': missing column %s", title, merge_value_col)
+        print(f"Skipping dashboard '{title}': missing column {merge_value_col}")
         return
 
     merge_metric = merge_table[["time_days", "merge_name", merge_value_col]].rename(
@@ -792,8 +789,8 @@ def _plot_metric_dashboard(
     output = Path(output_path)
     fig.savefig(output, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    logger.info("")
-    logger.info("Saved dynamic graph: %s", output.resolve())
+    print()
+    print(f"Saved dynamic graph: {output.resolve()}")
 
 
 def _build_metric_compact_tables(
@@ -960,7 +957,7 @@ def plot_all_dynamic_dashboards(
     # Only plot metrics where values actually change during the simulation
     metrics = [m for m in metrics if _metric_has_changes(dynamic_results, plant_results, m)]
     if not metrics:
-        logger.info("No metrics found in simulation results; skipping graphs.")
+        print("No metrics found in simulation results; skipping graphs.")
         return
 
     plt.rcParams.update(
@@ -1055,7 +1052,7 @@ def plot_all_dynamic_dashboards(
         plt.close(fig)
         saved_paths.append(metric_path)
 
-    logger.info("Saved %s graph(s) to: %s", len(saved_paths), graph_dir)
+    print(f"Saved {len(saved_paths)} graph(s) to: {graph_dir}")
 
 
 def plot_dynamic_change_graphs(
@@ -1235,8 +1232,8 @@ def plot_dynamic_change_graphs(
     output = Path(output_path)
     fig.savefig(output, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    logger.info("")
-    logger.info("Saved dynamic change graph: %s", output.resolve())
+    print()
+    print(f"Saved dynamic change graph: {output.resolve()}")
 
 
 def render_dynamic_reports(

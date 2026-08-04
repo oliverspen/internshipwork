@@ -144,7 +144,7 @@ def run_reaction_dynamic(
     output_dir.mkdir(parents=True, exist_ok=True)
     session_dir = (output_dir / timestamp).resolve()
     session_dir.mkdir(parents=True, exist_ok=True)
-
+    
     plant_results: list[dict[str, Any]] = []
 
     if progress_callback is not None:
@@ -182,7 +182,7 @@ def run_reaction_dynamic(
             plant_result.get("time_days", 0),
         )
         plant_result["final"] = tocomo_result.get("final", {})
-
+    
     # Save reports to the session directory
     if progress_callback is not None:
         progress_callback(96, 100, "Generating dynamic reports")
@@ -193,11 +193,11 @@ def run_reaction_dynamic(
         dynamic_profile,
         graph_output_path=str(graph_output_path),
     )
-
+    
     # Save results to Excel
     if progress_callback is not None:
         progress_callback(98, 100, "Writing Excel output")
-    save_dynamic_excel(
+    excel_path = save_dynamic_excel(
         dynamic_results,
         plant_results,
         session_dir,
@@ -206,5 +206,8 @@ def run_reaction_dynamic(
 
     if progress_callback is not None:
         progress_callback(99, 100, "Finalizing outputs")
-
+    
+    print(f"Dynamic TOCOMO results saved to: {session_dir}")
+    print(f"  - Graph: {graph_output_path}")
+    print(f"  - Excel: {excel_path}")
     return dynamic_results

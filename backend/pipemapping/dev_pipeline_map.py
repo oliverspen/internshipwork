@@ -12,15 +12,8 @@ from pprint import pformat
 from backend.user_inputs import get_input_config, set_runtime_input_config
 
 # BEGIN AUTO-GENERATED PIPELINE MAPS
-AUTO_GENERATED_PIPELINE_MAPS: dict[str, dict[str, object]] = {'fridayafternoon': {'merge_definitions': [{'merge_name': 'Merge1',
-                                            'sources': [['plant', 0], ['plant', 1], ['plant', 2]]}],
-                     'merge_pipe_inputs': {'Merge1': {'pipediameter': 0.5, 'pipelength': 48000.0}},
-                     'storage_name': 'Storage'},
- 'testing out': {'merge_definitions': [{'merge_name': 'Merge1',
-                                        'sources': [['plant', 0], ['plant', 1]]}],
-                 'merge_pipe_inputs': {'Merge1': {'pipediameter': 0.5, 'pipelength': 48000.0}},
-                 'storage_name': 'Storage'}}
-ACTIVE_AUTO_PIPELINE_MAP: str | None = 'testing out'
+AUTO_GENERATED_PIPELINE_MAPS: dict[str, dict[str, object]] = {}
+ACTIVE_AUTO_PIPELINE_MAP: str | None = 'realisticinput'
 # END AUTO-GENERATED PIPELINE MAPS
 
 
@@ -69,20 +62,15 @@ def select_dev_pipeline_map_name(configured_name: str | None = None) -> str:
             )
         return configured_name
 
-    map_choices = []
+    print("Available dev pipeline maps:")
     for idx, map_name in enumerate(available_names, start=1):
         suffix = " (default)" if map_name == default_name else ""
-        map_choices.append(f"{idx}. {map_name}{suffix}")
-    choices_text = "\n".join(map_choices)
+        print(f"{idx}. {map_name}{suffix}")
 
     if default_name is None:
-        selected = input(f"Available dev pipeline maps:\n{choices_text}\nSelect pipeline map name: ").strip()
+        selected = input("Select pipeline map name: ").strip()
     else:
-        selected = input(
-            "Available dev pipeline maps:\n"
-            f"{choices_text}\n"
-            f"Select pipeline map name (press Enter for '{default_name}'): "
-        ).strip()
+        selected = input(f"Select pipeline map name (press Enter for '{default_name}'): ").strip()
         if selected == "":
             return default_name
 

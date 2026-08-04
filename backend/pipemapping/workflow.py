@@ -12,10 +12,15 @@ named pipeline map configurations.
 from copy import deepcopy
 from pathlib import Path
 import re
+import sys
 from typing import Any
 from tkinter import messagebox
 
 import networkx as nx
+
+package_parent = str(Path(__file__).resolve().parents[2])
+if package_parent not in sys.path:
+    sys.path.insert(0, package_parent)
 
 from backend.pipemapping.dialogs import (
     ask_non_empty_with_back,

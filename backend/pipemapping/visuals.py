@@ -160,7 +160,20 @@ def init_live_preview() -> tuple[plt.Figure, plt.Axes]:
     # Interactive mode keeps preview responsive while Tk dialogs are open
     plt.ion()
     fig, ax = plt.subplots(figsize=(18, 10))
-    fig.canvas.manager.set_window_title("Pipeline Map Preview")
+    try:
+        fig.canvas.manager.set_window_title("Pipeline Map Preview")
+    except Exception:
+        pass
+    try:
+        # On TkAgg/Qt backends, maximize window so full graph remains visible.
+        manager = fig.canvas.manager
+        window = getattr(manager, "window", None)
+        if window is not None and hasattr(window, "state"):
+            window.state("zoomed")
+        elif hasattr(manager, "full_screen_toggle"):
+            manager.full_screen_toggle()
+    except Exception:
+        pass
     fig.tight_layout()
     fig.show()
     return fig, ax

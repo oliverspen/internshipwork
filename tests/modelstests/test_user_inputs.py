@@ -41,8 +41,6 @@ def test_validate_inputs_rejects_non_positive_merge_pipe_values():
 
 def test_build_input_config_deep_copies_and_normalizes_storage_name():
     source_plant = _valid_plant()
-    source_plant["stream_phase"] = "  GAS  "
-    source_plant["inlet_conc"] = {"so2": 1.0, " no2 ": 2.0}
     source_merge = _valid_merge_inputs()
     source_defs = [{"merge_name": "Merge 1", "sources": [("plant", 0)]}]
 
@@ -61,8 +59,6 @@ def test_build_input_config_deep_copies_and_normalizes_storage_name():
     assert config["merge_pipe_inputs"]["Merge 1"]["pipediameter"] == 0.2
     assert config["storage_name"] == "Tank"
     assert config["merge_definitions"] == source_defs
-    assert config["plant_inputs"][0]["stream_phase"] == "gas"
-    assert config["plant_inputs"][0]["inlet_conc"] == {"SO2": 1.0, "NO2": 2.0}
 
 
 def test_set_runtime_input_config_preserves_extra_keys_and_clear_resets():

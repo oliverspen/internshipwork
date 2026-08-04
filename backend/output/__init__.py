@@ -73,8 +73,6 @@ def _save_model_results(
         pipeline_map_name=pipeline_map_name,
     )
 
-    print(f"{model_label} results saved to: {session_dir}")
-    print(f"  - HTML: {html_path}")
     return str(session_dir)
 
 

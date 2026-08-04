@@ -69,15 +69,20 @@ def select_dev_pipeline_map_name(configured_name: str | None = None) -> str:
             )
         return configured_name
 
-    print("Available dev pipeline maps:")
+    map_choices = []
     for idx, map_name in enumerate(available_names, start=1):
         suffix = " (default)" if map_name == default_name else ""
-        print(f"{idx}. {map_name}{suffix}")
+        map_choices.append(f"{idx}. {map_name}{suffix}")
+    choices_text = "\n".join(map_choices)
 
     if default_name is None:
-        selected = input("Select pipeline map name: ").strip()
+        selected = input(f"Available dev pipeline maps:\n{choices_text}\nSelect pipeline map name: ").strip()
     else:
-        selected = input(f"Select pipeline map name (press Enter for '{default_name}'): ").strip()
+        selected = input(
+            "Available dev pipeline maps:\n"
+            f"{choices_text}\n"
+            f"Select pipeline map name (press Enter for '{default_name}'): "
+        ).strip()
         if selected == "":
             return default_name
 

@@ -24,21 +24,15 @@ from .topology import build_merge_definitions
 from backend.user_inputs import get_input_config
 
 
-def run_merge_support() -> None:
-    """Display calculated merge densities from active input configuration."""
+def run_merge_support() -> dict[str, dict[str, float]] | None:
+    """Compute merge inputs for the active configuration."""
     input_config = get_input_config()
     merge_definitions = input_config.get("merge_definitions")
 
     if not merge_definitions:
         return
 
-    merge_results = build_merge_inputs_from_definitions(merge_definitions)
-    print("Calculated merge densities:")
-    for merge_name, merge_result in merge_results.items():
-        print(
-            f"- {merge_name}: phase={merge_result['stream_phase']}, "
-            f"density={merge_result['density_kg_per_m3']:.5f} kg/m^3"
-        )
+    return build_merge_inputs_from_definitions(merge_definitions)
 
 __all__ = [
     "build_merge_definitions",

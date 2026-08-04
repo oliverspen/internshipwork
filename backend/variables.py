@@ -15,22 +15,22 @@ inlet_conc = {
     for species in PLANT_SPECIES
 }
 
-o2 = inlet_conc["O2"]
-h2o = inlet_conc["H2O"]
-so2 = inlet_conc["SO2"]
-no2 = inlet_conc["NO2"]
-no = inlet_conc["NO"]
-so3 = inlet_conc["SO3"]
-h2s = inlet_conc["H2S"]
+o2 = inlet_conc["o2"]
+h2o = inlet_conc["h2o"]
+so2 = inlet_conc["so2"]
+no2 = inlet_conc["no2"]
+no = inlet_conc["no"]
+so3 = inlet_conc["so3"]
+h2s = inlet_conc["h2s"]
 
 nonco2 = [
-    inlet_conc["O2"][i]
-    + inlet_conc["H2O"][i]
-    + inlet_conc["NO"][i]
-    + inlet_conc["NO2"][i]
-    + inlet_conc["SO3"][i]
-    + inlet_conc["H2S"][i]
-    for i in range(len(inlet_conc["O2"]))
+    inlet_conc["o2"][i]
+    + inlet_conc["h2o"][i]
+    + inlet_conc["no"][i]
+    + inlet_conc["no2"][i]
+    + inlet_conc["so3"][i]
+    + inlet_conc["h2s"][i]
+    for i in range(len(inlet_conc["o2"]))
 ]
 
 co2 = [10**6 - value for value in nonco2]  # molar ppm

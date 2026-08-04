@@ -141,10 +141,8 @@ async function loadMaps() {
     } else {
       showMapPreviewMessage('No saved maps yet. Create one to preview it here.');
     }
-    _setMapEditorButtonEnabled();
   } catch {
     showMapPreviewMessage('Could not load saved maps.');
-    _setMapEditorButtonEnabled();
   }
 }
 
@@ -257,7 +255,6 @@ function renderMapVariablesPopup(mapName, mapData, plantInputs = []) {
 }
 
 async function onMapSelectionChange() {
-  _setMapEditorButtonEnabled();
   const mapName = document.getElementById('map-sel').value;
   if (!mapName) {
     showMapPreviewMessage('Select a pipeline map to preview it here.');
@@ -1907,7 +1904,6 @@ document.getElementById('model-sel').addEventListener('change', () => {
   loadSessions();
 });
 document.getElementById('map-sel').addEventListener('change', onMapSelectionChange);
-_setMapEditorButtonEnabled();
 loadMaps();
 updateDynamicRunSettingsVisibility();
 loadSessions();
@@ -2284,8 +2280,6 @@ async function saveConfig() {
 const MB = {
   step: 1,
   name: '',
-  mode: 'create',
-  originalName: '',
   plants: [],
   merges: [],
   availableNodes: [],
@@ -2294,90 +2288,22 @@ const MB = {
   _draftGraphState: null,
 };
 
-function _setMapEditorButtonEnabled() {
-  const editBtn = document.getElementById('map-edit-btn');
-  const sel = document.getElementById('map-sel');
-  if (!editBtn || !sel) return;
-  editBtn.disabled = !String(sel.value || '').trim();
-}
-
-function _syncMapBuilderModeUi() {
-  const titleEl = document.getElementById('map-modal-title');
-  const saveBtn = document.getElementById('mb-save-btn');
-  if (titleEl) {
-    titleEl.textContent = MB.mode === 'edit' ? 'Edit Pipeline Map' : 'Create Pipeline Map';
-  }
-  if (saveBtn) {
-    saveBtn.textContent = MB.mode === 'edit' ? 'Update Map' : '✓ Save Map';
-  }
-}
-
-function _buildMergesFromMapData(mapData, fallbackPipeInputs = {}) {
-  const defs = Array.isArray(mapData?.merge_definitions) ? mapData.merge_definitions : [];
-  const pipeInputs = mapData?.merge_pipe_inputs || {};
-
-  return defs.map(def => {
-    const mergeName = String(def?.merge_name || '').trim();
-    const pipe = pipeInputs[mergeName] || fallbackPipeInputs[mergeName] || {};
-    return {
-      merge_name: mergeName,
-      sources: Array.isArray(def?.sources) ? def.sources.map(src => [src[0], src[1]]) : [],
-      pipelength: Number(pipe.pipelength ?? 10000),
-      pipediameter: Number(pipe.pipediameter ?? 0.5),
-    };
-  });
-}
-
-async function openMapBuilder(options = {}) {
-  const mode = options?.mode === 'edit' ? 'edit' : 'create';
-  const mapName = String(options?.mapName || '').trim();
+async function openMapBuilder() {
   const cfg = await api('/api/config/');
-
-  let mapData = null;
-  if (mode === 'edit') {
-    if (!mapName) {
-      alert('Select a saved map first.');
-      return;
-    }
-    mapData = await api(`/api/maps/${encodeURIComponent(mapName)}`);
-  }
-
   MB._plants = cfg.plant_inputs;
   MB._mergePipeInputs = cfg.merge_pipe_inputs || {};
-  MB.mode = mode;
-  MB.originalName = mode === 'edit' ? mapName : '';
-  MB.storageName = mode === 'edit'
-    ? (mapData?.storage_name || cfg.storage_name || 'Storage').trim() || 'Storage'
-    : (cfg.storage_name || 'Storage').trim() || 'Storage';
+  MB.storageName = (cfg.storage_name || 'Storage').trim() || 'Storage';
   MB.step = 1;
-  MB.name = mode === 'edit' ? mapName : '';
-  MB.plants = mode === 'edit'
-    ? _extractPlantIndexesFromMap(mapData, cfg.plant_inputs?.length || 0)
-    : [];
-  MB.merges = mode === 'edit'
-    ? _buildMergesFromMapData(mapData, cfg.merge_pipe_inputs || {})
-    : [];
+  MB.name = '';
+  MB.plants = [];
+  MB.merges = [];
   MB.availableNodes = [];
   MB._lastLayout = null;
   MB._manualNodePositions = {};
   MB._draftGraphState = null;
-  _syncMapBuilderModeUi();
   renderMBStep1();
   renderMBDraftReview();
   openModal('map-modal');
-}
-
-async function openMapEditor() {
-  const mapName = String(document.getElementById('map-sel')?.value || '').trim();
-  if (!mapName) {
-    alert('Select a saved map first.');
-    return;
-  }
-  try {
-    await openMapBuilder({ mode: 'edit', mapName });
-  } catch (e) {
-    alert(`Could not load map for editing: ${e.message}`);
-  }
 }
 
 function updateMBPlantsFromStep1() {
@@ -2407,18 +2333,13 @@ function renderMBStep1() {
 
 function renderMBStep3() {
   setWizardStep(3);
-  const nameInputDisabled = MB.mode === 'edit' ? 'disabled' : '';
-  const nameHelpText = MB.mode === 'edit'
-    ? '<div class="empty" style="text-align:left;padding:0;color:#4a5568">Map name is fixed while editing. Use + New to save as a different map name.</div>'
-    : '';
   document.getElementById('mb-step3').innerHTML = `
     <div class="section-label" style="margin-top:0">Finalize map</div>
     <div class="field-row" style="margin-bottom:1rem">
       <label style="max-width:420px"><span>Map name</span>
-        <input id="mb-name" placeholder="e.g. my_pipeline" value="${_esc(MB.name)}" oninput="MB.name = this.value.trim()" ${nameInputDisabled}>
+        <input id="mb-name" placeholder="e.g. my_pipeline" value="${_esc(MB.name)}" oninput="MB.name = this.value.trim()">
       </label>
     </div>
-    ${nameHelpText}
     <div class="section-label" style="margin-top:0">Storage</div>
     <div class="field-row" style="margin-bottom:1rem">
       <label style="max-width:360px"><span>Storage node name</span>
@@ -2844,31 +2765,16 @@ async function saveMBMap() {
   );
 
   try {
-    const pipelineMapPayload = {
-      merge_definitions: mergeDefinitions,
-      merge_pipe_inputs: mergePipeInputs,
-      storage_name: MB.storageName,
-    };
-
-    if (MB.mode === 'edit') {
-      await api(`/api/maps/${encodeURIComponent(MB.originalName || MB.name)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pipelineMapPayload),
-      });
-    } else {
-      await api('/api/maps/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: MB.name, pipeline_map: pipelineMapPayload }),
-      });
-    }
-
+    await api('/api/maps/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: MB.name,
+        pipeline_map: { merge_definitions: mergeDefinitions, merge_pipe_inputs: mergePipeInputs, storage_name: MB.storageName },
+      }),
+    });
     closeModal('map-modal');
-    await loadMaps();
-    document.getElementById('map-sel').value = MB.name;
-    _setMapEditorButtonEnabled();
-    await previewSelectedMap();
+    loadMaps();
   } catch (e) {
     alert('Save failed: ' + e.message);
   }
@@ -2885,5 +2791,4 @@ function setWizardStep(n) {
   document.getElementById('mb-back-btn').style.display = (n === 2 || n === 3) ? '' : 'none';
   document.getElementById('mb-save-btn').style.display = n === 3 ? '' : 'none';
   MB.step = n;
-  _syncMapBuilderModeUi();
 }

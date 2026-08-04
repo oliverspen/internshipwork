@@ -36,10 +36,7 @@
 
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem;">
         <label for="map-sel" style="margin:0">Pipeline Map</label>
-        <div style="display:flex;gap:.35rem;align-items:center;">
-          <button class="btn btn-sm" id="map-edit-btn" onclick="openMapEditor()" style="font-size:.75rem;padding:.2rem .55rem;">Edit</button>
-          <button class="btn btn-sm" onclick="openMapBuilder()" style="font-size:.75rem;padding:.2rem .55rem;">&#43; New</button>
-        </div>
+        <button class="btn btn-sm" onclick="openMapBuilder()" style="font-size:.75rem;padding:.2rem .55rem;">&#43; New</button>
       </div>
       <select id="map-sel"><option value="">Loading…</option></select>
 
@@ -161,7 +158,7 @@
 <div id="map-modal" class="modal">
   <div class="modal-box wide">
     <div class="modal-header">
-      <h2 id="map-modal-title">Create Pipeline Map</h2>
+      <h2>Create Pipeline Map</h2>
       <button class="btn-close" onclick="closeModal('map-modal')">&#10005;</button>
     </div>
     <div class="modal-body">

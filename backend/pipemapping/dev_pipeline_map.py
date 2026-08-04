@@ -12,15 +12,8 @@ from pprint import pformat
 from backend.user_inputs import get_input_config, set_runtime_input_config
 
 # BEGIN AUTO-GENERATED PIPELINE MAPS
-AUTO_GENERATED_PIPELINE_MAPS: dict[str, dict[str, object]] = {'fridayafternoon': {'merge_definitions': [{'merge_name': 'Merge1',
-                                            'sources': [['plant', 0], ['plant', 1], ['plant', 2]]}],
-                     'merge_pipe_inputs': {'Merge1': {'pipediameter': 0.5, 'pipelength': 48000.0}},
-                     'storage_name': 'Storage'},
- 'testing out': {'merge_definitions': [{'merge_name': 'Merge1',
-                                        'sources': [['plant', 0], ['plant', 1]]}],
-                 'merge_pipe_inputs': {'Merge1': {'pipediameter': 0.5, 'pipelength': 48000.0}},
-                 'storage_name': 'Storage'}}
-ACTIVE_AUTO_PIPELINE_MAP: str | None = 'testing out'
+AUTO_GENERATED_PIPELINE_MAPS: dict[str, dict[str, object]] = {}
+ACTIVE_AUTO_PIPELINE_MAP: str | None = 'realisticinput'
 # END AUTO-GENERATED PIPELINE MAPS
 
 

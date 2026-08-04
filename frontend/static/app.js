@@ -699,7 +699,7 @@ async function _run(model, mapName) {
 
     const isDynamicModel = _isDynamicModel(model);
     if (isDynamicModel) {
-      renderDynamicGraphs(result.graph_urls || [], mapName);
+      renderDynamicGraphs(result.results || [], mapName);
       hideResultsSummary();
     } else {
       const [mapData, cfg] = await Promise.all([
@@ -766,36 +766,148 @@ function setMapPanelTitle(title) {
   titleEl.textContent = title;
 }
 
-function _graphLabelFromUrl(url, index) {
-  const fallback = `Graph ${index + 1}`;
-  if (!url) return fallback;
-  const parts = String(url).split('/');
-  const fileName = parts[parts.length - 1] || '';
-  if (!fileName) return fallback;
-  const base = fileName.replace(/\.png$/i, '').replace(/[_-]+/g, ' ').trim();
-  return base ? base.replace(/\b\w/g, c => c.toUpperCase()) : fallback;
+let _dynamicGraphRows = [];
+
+function _dynamicMetricOptions(rows) {
+  const options = [{ key: 'flow_kg_per_h', label: 'Flow (kg/h)' }];
+  const species = new Set();
+  (rows || []).forEach(row => {
+    const final = row?.final;
+    if (!final || typeof final !== 'object') return;
+    Object.keys(final).forEach(k => {
+      const name = String(k || '').trim();
+      if (name) species.add(name.toUpperCase());
+    });
+  });
+  Array.from(species).sort().forEach(sp => {
+    options.push({ key: `final:${sp}`, label: `${sp} (ppm)` });
+  });
+  return options;
 }
 
-function renderDynamicGraphs(graphUrls, mapName) {
-  const uniqueUrls = Array.isArray(graphUrls)
-    ? Array.from(new Set(graphUrls.filter(Boolean).map(String)))
-    : [];
+function _valueForDynamicMetric(row, metricKey) {
+  if (metricKey === 'flow_kg_per_h') return Number(row?.flow_kg_per_h);
+  if (!String(metricKey).startsWith('final:')) return NaN;
+  const species = String(metricKey).slice('final:'.length);
+  const final = row?.final;
+  if (!final || typeof final !== 'object') return NaN;
+  return Number(final?.[species]);
+}
+
+function _buildDynamicSeries(rows, metricKey) {
+  const groups = new Map();
+  (rows || []).forEach(row => {
+    const mergeName = String(row?.merge_name || '').trim() || 'merge';
+    const t = Number(row?.time_days);
+    const v = _valueForDynamicMetric(row, metricKey);
+    if (!Number.isFinite(t) || !Number.isFinite(v)) return;
+    if (!groups.has(mergeName)) groups.set(mergeName, []);
+    groups.get(mergeName).push({ t, v });
+  });
+
+  const series = [];
+  groups.forEach((pts, mergeName) => {
+    const sorted = pts.sort((a, b) => a.t - b.t);
+    if (!sorted.length) return;
+    series.push({ mergeName, points: sorted });
+  });
+  return series;
+}
+
+function _dynamicChartSvg(series, metricLabel) {
+  const width = 940;
+  const height = 360;
+  const pad = { top: 18, right: 20, bottom: 38, left: 58 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+
+  const allPoints = series.flatMap(s => s.points);
+  const xs = allPoints.map(p => p.t);
+  const ys = allPoints.map(p => p.v);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const xSpan = maxX - minX || 1;
+  const ySpan = maxY - minY || 1;
+
+  const xPx = (x) => pad.left + ((x - minX) / xSpan) * innerW;
+  const yPx = (y) => pad.top + (1 - ((y - minY) / ySpan)) * innerH;
+
+  const colors = ['#1f77b4', '#d95f02', '#2ca02c', '#9467bd', '#17becf', '#8c564b'];
+  const lineSvg = series.map((s, idx) => {
+    const pts = s.points.map(p => `${xPx(p.t).toFixed(2)},${yPx(p.v).toFixed(2)}`).join(' ');
+    return `<polyline fill="none" stroke="${colors[idx % colors.length]}" stroke-width="2" points="${pts}" />`;
+  }).join('');
+
+  const legendSvg = series.map((s, idx) => {
+    const y = pad.top + 14 + idx * 18;
+    const color = colors[idx % colors.length];
+    return `
+      <line x1="${width - 170}" y1="${y}" x2="${width - 150}" y2="${y}" stroke="${color}" stroke-width="2" />
+      <text x="${width - 145}" y="${y + 4}" font-size="12" fill="#2d3748">${_esc(s.mergeName)}</text>
+    `;
+  }).join('');
+
+  const xTicks = 5;
+  const yTicks = 5;
+  const xTickSvg = Array.from({ length: xTicks + 1 }, (_, i) => {
+    const ratio = i / xTicks;
+    const xVal = minX + ratio * xSpan;
+    const x = pad.left + ratio * innerW;
+    return `
+      <line x1="${x}" y1="${pad.top + innerH}" x2="${x}" y2="${pad.top + innerH + 6}" stroke="#4a5568" />
+      <text x="${x}" y="${pad.top + innerH + 20}" text-anchor="middle" font-size="11" fill="#4a5568">${xVal.toFixed(2)}</text>
+    `;
+  }).join('');
+
+  const yTickSvg = Array.from({ length: yTicks + 1 }, (_, i) => {
+    const ratio = i / yTicks;
+    const yVal = minY + (1 - ratio) * ySpan;
+    const y = pad.top + ratio * innerH;
+    return `
+      <line x1="${pad.left - 6}" y1="${y}" x2="${pad.left}" y2="${y}" stroke="#4a5568" />
+      <line x1="${pad.left}" y1="${y}" x2="${pad.left + innerW}" y2="${y}" stroke="#edf2f7" />
+      <text x="${pad.left - 10}" y="${y + 4}" text-anchor="end" font-size="11" fill="#4a5568">${yVal.toFixed(2)}</text>
+    `;
+  }).join('');
+
+  return `
+    <svg class="map-preview-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Dynamic chart ${_esc(metricLabel)}">
+      <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" />
+      <text x="${pad.left}" y="14" font-size="13" fill="#1a365d" font-weight="600">${_esc(metricLabel)} over time</text>
+      <line x1="${pad.left}" y1="${pad.top + innerH}" x2="${pad.left + innerW}" y2="${pad.top + innerH}" stroke="#4a5568" />
+      <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + innerH}" stroke="#4a5568" />
+      ${yTickSvg}
+      ${xTickSvg}
+      ${lineSvg}
+      ${legendSvg}
+      <text x="${pad.left + innerW / 2}" y="${height - 6}" text-anchor="middle" font-size="12" fill="#4a5568">Time (days)</text>
+    </svg>
+  `;
+}
+
+function renderDynamicGraphs(dynamicRows, mapName) {
+  const rows = Array.isArray(dynamicRows) ? dynamicRows : [];
+  const metricOptions = _dynamicMetricOptions(rows);
+  _dynamicGraphRows = rows;
 
   const placeholder = document.getElementById('map-placeholder');
   const frame = document.getElementById('map-frame');
   frame.style.display = 'none';
   frame.src = 'about:blank';
 
-  if (!uniqueUrls.length) {
+  if (!rows.length || !metricOptions.length) {
     setMapPanelTitle('Dynamic Graphs');
-    showMapPreviewMessage('Dynamic run completed, but no graph images were found for this session.');
+    showMapPreviewMessage('Dynamic run completed, but no chartable data was returned.');
     return;
   }
 
-  const options = uniqueUrls
-    .map((url, idx) => `<option value="${_esc(url)}">${_esc(_graphLabelFromUrl(url, idx))}</option>`)
+  const options = metricOptions
+    .map(opt => `<option value="${_esc(opt.key)}">${_esc(opt.label)}</option>`)
     .join('');
-  const initialUrl = uniqueUrls[0];
+  const initialMetric = metricOptions[0].key;
 
   setMapPanelTitle('Dynamic Graphs');
   placeholder.className = '';
@@ -804,27 +916,37 @@ function renderDynamicGraphs(graphUrls, mapName) {
       <div class="dynamic-graphs-header">
         <div class="map-preview-title">Graphs for <strong>${_esc(mapName)}</strong></div>
         <div class="dynamic-graphs-controls">
-          <label for="dynamic-graph-select">Graph</label>
+          <label for="dynamic-graph-select">Metric</label>
           <select id="dynamic-graph-select" onchange="switchDynamicGraph()">${options}</select>
-          <a id="dynamic-graph-open" class="btn btn-sm link" href="${_esc(initialUrl)}" target="_blank">Open full size</a>
         </div>
       </div>
-      <div class="dynamic-graph-stage">
-        <img id="dynamic-graph-image" class="dynamic-graph-image" src="${_esc(initialUrl)}" alt="Dynamic simulation graph">
-      </div>
+      <div class="dynamic-graph-stage" id="dynamic-graph-stage"></div>
     </div>
   `;
   placeholder.style.display = 'block';
+  switchDynamicGraph(initialMetric);
 }
 
-function switchDynamicGraph() {
+function switchDynamicGraph(metricOverride = null) {
   const select = document.getElementById('dynamic-graph-select');
-  const img = document.getElementById('dynamic-graph-image');
-  const link = document.getElementById('dynamic-graph-open');
-  const selectedUrl = String(select?.value || '');
-  if (!selectedUrl || !img || !link) return;
-  img.src = selectedUrl;
-  link.href = selectedUrl;
+  const stage = document.getElementById('dynamic-graph-stage');
+  const selectedMetric = String(metricOverride || select?.value || 'flow_kg_per_h');
+  if (!stage) return;
+
+  const options = _dynamicMetricOptions(_dynamicGraphRows);
+  const selectedOpt = options.find(opt => opt.key === selectedMetric) || options[0];
+  if (select && selectedOpt) select.value = selectedOpt.key;
+  if (!selectedOpt) {
+    stage.innerHTML = '<div class="empty">No graphable metric available.</div>';
+    return;
+  }
+
+  const series = _buildDynamicSeries(_dynamicGraphRows, selectedOpt.key);
+  if (!series.length) {
+    stage.innerHTML = `<div class="empty">No data points for ${_esc(selectedOpt.label)}.</div>`;
+    return;
+  }
+  stage.innerHTML = _dynamicChartSvg(series, selectedOpt.label);
 }
 
 function hideResultsSummary() {

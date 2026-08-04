@@ -3,7 +3,6 @@
 import json
 import threading
 import uuid
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -19,7 +18,6 @@ from backend.pipemapping.dev_pipeline_map import _all_dev_pipeline_maps
 
 router = APIRouter()
 
-_RESULTS_ROOT = Path(__file__).resolve().parents[3] / "results"
 _MODEL_FOLDERS = {
     "tocomo": "tocomo",
     "phpitz": "phpitz_reactive",
@@ -29,17 +27,6 @@ _MODEL_FOLDERS = {
 
 # Simple in-memory job store; fine for a single-process dev server.
 _jobs: dict[str, dict[str, Any]] = {}
-
-
-def _find_latest_session(model_folder: str) -> str | None:
-    """Return the name of the most recently created session directory."""
-    model_dir = _RESULTS_ROOT / model_folder
-    if not model_dir.exists():
-        return None
-    dirs = [d for d in model_dir.iterdir() if d.is_dir()]
-    return max(dirs, key=lambda d: d.stat().st_mtime).name if dirs else None
-
-
 def _to_json_safe(obj: Any) -> Any:
     """Recursively convert numpy/non-serializable types to JSON-native equivalents."""
     return json.loads(
@@ -122,7 +109,7 @@ def _run_job(
 
             results = run_reaction(
                 use_dev_pipeline_map=True,
-                save_results=True,
+                save_results=False,
                 progress_callback=_update_progress,
             )
         elif model == "phpitz":
@@ -130,7 +117,7 @@ def _run_job(
 
             results = run_reaction(
                 use_dev_pipeline_map=True,
-                save_results=True,
+                save_results=False,
                 progress_callback=_update_progress,
             )
         elif model == "tocomo_dynamic":
@@ -158,25 +145,9 @@ def _run_job(
         else:
             raise ValueError(f"Unknown model '{model}'.")
 
-        folder = _MODEL_FOLDERS[model]
-        session_id = _find_latest_session(folder)
+        session_id = None
         html_url = summary_excel_url = None
         graph_urls: list[str] = []
-        if session_id:
-            session_dir = _RESULTS_ROOT / folder / session_id
-            html_files = list(session_dir.glob("*_map.html"))
-            graph_files = sorted((session_dir / "graphs").glob("*.png"))
-            html_url = f"/results/{folder}/{session_id}/{html_files[0].name}" if html_files else None
-            graph_urls = [
-                f"/results/{folder}/{session_id}/graphs/{graph_file.name}"
-                for graph_file in graph_files
-            ]
-            summary_excel_path = session_dir / "summary.xlsx"
-            dynamic_excel_path = session_dir / "dynamic_results.xlsx"
-            if summary_excel_path.exists():
-                summary_excel_url = f"/results/{folder}/{session_id}/summary.xlsx"
-            elif dynamic_excel_path.exists():
-                summary_excel_url = f"/results/{folder}/{session_id}/dynamic_results.xlsx"
 
         _jobs[job_id].update({
             "status": "done",

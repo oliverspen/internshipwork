@@ -125,6 +125,7 @@ def save_dynamic_excel(
                     if isinstance(final_dict, dict):
                         for species, value in sorted(final_dict.items()):
                             row[f"final_{species}"] = _round_conc(value)
+                    storage_data.append(row)
 
                 if storage_data:
                     storage_df = pd.DataFrame(storage_data).sort_values("time_days")

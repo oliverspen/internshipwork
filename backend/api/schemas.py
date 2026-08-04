@@ -71,7 +71,7 @@ class ConfigUpdateRequest(BaseModel):
 
 
 class PipelineMapCreateRequest(BaseModel):
-    name: str = Field(..., pattern=r"^[a-z0-9_\-]+$", description="Lowercase identifier for the map.")
+    name: str = Field(..., min_length=1, description="Display name for the map; spaces are allowed.")
     pipeline_map: PipelineMap
 
 

@@ -202,3 +202,11 @@ def test_remove_last_merge_removes_state_and_node(monkeypatch: pytest.MonkeyPatc
     assert state.merge_history == []
     assert state.merge_index == 2
     assert refresh_calls["count"] == 1
+
+
+def test_normalize_map_name_preserves_spaces_between_words():
+    assert workflow._normalize_map_name("  North Sea Export  ") == "North Sea Export"
+
+
+def test_normalize_map_name_removes_unsupported_characters():
+    assert workflow._normalize_map_name("Map! #1") == "Map 1"

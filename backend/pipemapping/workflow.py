@@ -41,7 +41,7 @@ _NORWEGIAN = str.maketrans({'æ': 'ae', 'Æ': 'ae', 'ø': 'oe', 'Ø': 'oe', 'å'
 def _normalize_map_name(raw_name: str) -> str:
     """Normalize user-provided map name to valid identifier format.
     
-    Converts to lowercase, removes invalid characters, and replaces with underscores.
+    Preserves spaces between words while removing unsupported characters.
     
     Args:
         raw_name: User-provided pipeline map name
@@ -50,9 +50,9 @@ def _normalize_map_name(raw_name: str) -> str:
         Normalized name suitable for use as a config identifier
     """
     transliterated = raw_name.translate(_NORWEGIAN)
-    normalized = re.sub(r"[^A-Za-z0-9_-]+", "_", transliterated.strip().lower())
-    normalized = normalized.strip("_")
-    return normalized or "pipeline_map"
+    normalized = re.sub(r"[^A-Za-z0-9 _-]+", "", transliterated.strip())
+    normalized = re.sub(r"\s+", " ", normalized).strip(" _-")
+    return normalized or "pipeline map"
 
 
 def _refresh_preview(preview: tuple[object, object], state: WizardState) -> None:

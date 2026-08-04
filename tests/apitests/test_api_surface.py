@@ -17,6 +17,10 @@ def test_fastapi_app_includes_expected_routes():
     assert "/api/simulate/{model}" in path_map
     assert "/api/simulate/jobs/{job_id}" in path_map
 
+    map_item = path_map.get("/api/maps/{name}", {})
+    assert "get" in map_item
+    assert "put" in map_item
+
 
 def test_session_info_schema_supports_graph_urls():
     schemas = importlib.import_module("internshipwork.api.schemas")

@@ -30,13 +30,28 @@
       "temperature_celsius": -40.0,
       "pipelength": 37000.0,
       "pipediameter": 0.9
+    },
+    {
+      "name": "Plant C",
+      "inlet_conc": {
+        "O2": 6.0,
+        "H2O": 2.0,
+        "H2S": 0.0,
+        "SO2": 0.0,
+        "NO2": 0.0
+      },
+      "stream_phase": "liquid",
+      "flowrate": 1000.0,
+      "temperature_celsius": -50.0,
+      "pipelength": 10000.0,
+      "pipediameter": 0.5
     }
   ],
   "merge_pipe_inputs": {
     "Merge1": {
       "pipelength": 48000.0,
       "pipediameter": 0.5
-  }
-},
+    }
+  },
   "storage_name": "Storage"
 }

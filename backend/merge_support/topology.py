@@ -1,16 +1,7 @@
-"""Topology module for extracting merge definitions from pipeline graph.
+"""
+Topology extracts merge definitions from the pipeline graph. 
 
-Converts a NetworkX directed graph of pipeline components into structured merge definitions.
-Merges are extracted in topological order to ensure upstream merges are processed before
-downstream merges that depend on them.
-
-Input graph structure:
-- Nodes: pipeline components (plants, merges, junctions, storage)
-- Edges: stream connections from sources to sinks
-- node_types: Mapping of node names to types ('plant', 'merge', 'junction', 'storage')
-- plant nodes have 'plant_index' attribute (numeric index into plant inputs)
-
-Output: List of merge definitions ordered for dependency resolution.
+Converts the networkx graph of pipelines to structured merge, extracted in topological order to ensure upstream -> downstream.
 """
 
 import networkx as nx

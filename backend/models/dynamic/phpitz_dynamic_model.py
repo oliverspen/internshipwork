@@ -38,12 +38,12 @@ def _evaluate_phpitz_plant(
     """
     # Extract inlet concentrations from plant values (PH_PITZ supports 6 species including NO)
     input_concentrations = {
-        "H2O": plant_values.get("inlet_h2o", 0),
-        "O2": plant_values.get("inlet_o2", 0),
-        "SO2": plant_values.get("inlet_so2", 0),
-        "NO2": plant_values.get("inlet_no2", 0),
-        "NO": plant_values.get("inlet_no", 0),
-        "H2S": plant_values.get("inlet_h2s", 0),
+        "H2O": plant_values.get("inlet_H2O", 0),
+        "O2": plant_values.get("inlet_O2", 0),
+        "SO2": plant_values.get("inlet_SO2", 0),
+        "NO2": plant_values.get("inlet_NO2", 0),
+        "NO": plant_values.get("inlet_NO", 0),
+        "H2S": plant_values.get("inlet_H2S", 0),
     }
     
     # Get pressure from input config (consistent with main runners)
@@ -59,8 +59,8 @@ def _evaluate_phpitz_plant(
         pressure_bara=pressure_bara,
     )
 
-    # Normalize species names to lowercase for consistency with graph code
-    final_normalized = {k.lower(): v for k, v in final_values.items()} if final_values else {}
+    # Enforce uppercase species keys across backend outputs.
+    final_normalized = {str(k).upper(): v for k, v in final_values.items()} if final_values else {}
 
     return {
         "phpitz_input": input_concentrations,
@@ -108,8 +108,8 @@ def _evaluate_phpitz_merge(
         pressure_bara=pressure_bara,
     )
 
-    # Normalize species names to lowercase for consistency with graph code
-    final_normalized = {k.lower(): v for k, v in final_values.items()} if final_values else {}
+    # Enforce uppercase species keys across backend outputs.
+    final_normalized = {str(k).upper(): v for k, v in final_values.items()} if final_values else {}
 
     return {
         "phpitz_input": input_concentrations,

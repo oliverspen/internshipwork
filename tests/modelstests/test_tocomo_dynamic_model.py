@@ -45,7 +45,7 @@ def test_evaluate_tocomo_merge_maps_supported_species_and_normalizes_output(monk
     assert captured["pressure_bara"] == 12.5
     assert captured["temperature_kelvin"] == 333.15
     assert "NO" not in captured["input_concentrations"]
-    assert result["final"] == {"so2": 1.5, "h2o": 2.0}
+    assert result["final"] == {"SO2": 1.5, "H2O": 2.0}
 
 
 def test_run_reaction_dynamic_tocomo_orchestrates_progress_and_outputs(monkeypatch, tmp_path: Path):
@@ -66,7 +66,7 @@ def test_run_reaction_dynamic_tocomo_orchestrates_progress_and_outputs(monkeypat
     monkeypatch.setattr(
         tocomo_dynamic_model,
         "_evaluate_tocomo_plant",
-        lambda *args, **kwargs: {"final": {"so2": 0.2}},
+        lambda *args, **kwargs: {"final": {"SO2": 0.2}},
     )
 
     def _fake_render(dynamic_results, plant_results, dynamic_profile, graph_output_path):
@@ -99,4 +99,4 @@ def test_run_reaction_dynamic_tocomo_orchestrates_progress_and_outputs(monkeypat
     assert [event[0] for event in progress_events[-4:]] == [92, 96, 98, 99]
     assert report_calls["graph_output_path"].endswith("_change_points.png")
     assert Path(excel_calls["session_dir"]).exists()
-    assert excel_calls["plant_results"][0]["final"] == {"so2": 0.2}
+    assert excel_calls["plant_results"][0]["final"] == {"SO2": 0.2}

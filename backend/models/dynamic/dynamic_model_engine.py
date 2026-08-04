@@ -128,8 +128,13 @@ def _build_dynamic_input_config(
         inlet_profile_by_species: dict[str, list[tuple[float, float]]] = plant_profile.get("inlet_conc", {})
         if inlet_profile_by_species:
             for species, points in inlet_profile_by_species.items():
-                current_value = float(plant_input["inlet_conc"].get(species, 0.0))
-                plant_input["inlet_conc"][species] = _step_hold_value(time_days, points, current_value)
+                species_key = str(species).strip().upper()
+                current_value = float(plant_input["inlet_conc"].get(species_key, 0.0))
+                plant_input["inlet_conc"][species_key] = _step_hold_value(
+                    time_days,
+                    points,
+                    current_value,
+                )
 
     return config
 
@@ -308,8 +313,6 @@ def run_dynamic_merges(
                 if collect_plant_rows is not None:
                     plant_input = plant_inputs_step[stream_idx]
                     inlet_conc = plant_input.get("inlet_conc", {})
-                    # Create case-insensitive lookup by converting all keys to lowercase
-                    inlet_conc_lower = {k.lower(): v for k, v in inlet_conc.items()}
                     collect_plant_rows.append(
                         {
                             "time_days": round(time_days, 5),
@@ -325,13 +328,13 @@ def run_dynamic_merges(
                             ),
                             "pipe_length_m": plant_input.get("pipelength"),
                             "pipe_diameter_m": plant_input.get("pipediameter"),
-                            "inlet_o2": inlet_conc_lower.get("o2", 0.0),
-                            "inlet_h2o": inlet_conc_lower.get("h2o", 0.0),
-                            "inlet_so2": inlet_conc_lower.get("so2", 0.0),
-                            "inlet_no2": inlet_conc_lower.get("no2", 0.0),
-                            "inlet_no": inlet_conc_lower.get("no", 0.0),
-                            "inlet_so3": inlet_conc_lower.get("so3", 0.0),
-                            "inlet_h2s": inlet_conc_lower.get("h2s", 0.0),
+                            "inlet_O2": float(inlet_conc.get("O2", 0.0)),
+                            "inlet_H2O": float(inlet_conc.get("H2O", 0.0)),
+                            "inlet_SO2": float(inlet_conc.get("SO2", 0.0)),
+                            "inlet_NO2": float(inlet_conc.get("NO2", 0.0)),
+                            "inlet_NO": float(inlet_conc.get("NO", 0.0)),
+                            "inlet_SO3": float(inlet_conc.get("SO3", 0.0)),
+                            "inlet_H2S": float(inlet_conc.get("H2S", 0.0)),
                         }
                     )
 
@@ -423,7 +426,8 @@ def run_dynamic_merges(
                 ppm_molar = merge_values.get("ppm_molar", {})
                 if isinstance(ppm_molar, dict):
                     for species, value in ppm_molar.items():
-                        result_row[f"inlet_{species.lower()}"] = value
+                        species_key = str(species).strip().upper()
+                        result_row[f"inlet_{species_key}"] = value
                 result_row.update(evaluate_merge(merge_name, merge_values, time_days))
                 dynamic_results.append(result_row)
 

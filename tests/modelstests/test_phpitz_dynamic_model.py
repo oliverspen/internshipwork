@@ -44,7 +44,7 @@ def test_evaluate_phpitz_merge_includes_no_and_normalizes_output(monkeypatch):
     assert captured["model_id"] == "phpitz_reactive"
     assert captured["pressure_bara"] == 8.0
     assert captured["input_concentrations"]["NO"] == 7.0
-    assert result["final"] == {"so2": 3.0, "no": 4.0}
+    assert result["final"] == {"SO2": 3.0, "NO": 4.0}
 
 
 def test_run_reaction_dynamic_phpitz_orchestrates_progress_and_outputs(monkeypatch, tmp_path: Path):
@@ -65,7 +65,7 @@ def test_run_reaction_dynamic_phpitz_orchestrates_progress_and_outputs(monkeypat
     monkeypatch.setattr(
         phpitz_dynamic_model,
         "_evaluate_phpitz_plant",
-        lambda *args, **kwargs: {"final": {"no": 0.3}},
+        lambda *args, **kwargs: {"final": {"NO": 0.3}},
     )
 
     def _fake_render(dynamic_results, plant_results, dynamic_profile, graph_output_path):
@@ -98,4 +98,4 @@ def test_run_reaction_dynamic_phpitz_orchestrates_progress_and_outputs(monkeypat
     assert [event[0] for event in progress_events[-4:]] == [92, 96, 98, 99]
     assert report_calls["graph_output_path"].endswith("_change_points.png")
     assert Path(excel_calls["session_dir"]).exists()
-    assert excel_calls["plant_results"][0]["final"] == {"no": 0.3}
+    assert excel_calls["plant_results"][0]["final"] == {"NO": 0.3}

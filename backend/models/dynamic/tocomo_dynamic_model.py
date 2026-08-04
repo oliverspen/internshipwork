@@ -6,13 +6,17 @@ time-varying inlet stream conditions.
 
 Main entry point: run_reaction_dynamic() orchestrates the entire simulation workflow
 including plant state collection, merge property calculation, TOCOMO API evaluation,
-and result generation for API consumption.
+and report generation.
 """
 
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable
 
 from backend.models.api_client import post_model
 from backend.models.dynamic.dynamic_model_engine import run_dynamic_merges
+from backend.output.dynamic_reporting import render_dynamic_reports
+from backend.output.excel_export import save_dynamic_excel
 from backend.user_inputs import get_input_config
 
 
@@ -124,7 +128,7 @@ def run_reaction_dynamic(
     2. At each time step, merges are calculated with transport delays
     3. TOCOMO API evaluates equilibrium concentrations at each merge
     4. Results are collected for plant states and merge states
-    5. Results are returned for downstream API/frontend visualization.
+    5. Summary reports (graphs, tables) are generated and saved to results/tocomo_dynamic/{timestamp}
     
     Args:
         duration_days: Simulation duration in days, or None to auto-derive from pipe times.
@@ -134,6 +138,13 @@ def run_reaction_dynamic(
     Returns:
         List of merge result dicts (one per time_step, merge_name) with TOCOMO outputs.
     """
+    # Create results/tocomo_dynamic/{timestamp} folder
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = (Path(__file__).resolve().parents[3] / "results" / "tocomo_dynamic").resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    session_dir = (output_dir / timestamp).resolve()
+    session_dir.mkdir(parents=True, exist_ok=True)
+    
     plant_results: list[dict[str, Any]] = []
 
     if progress_callback is not None:
@@ -172,7 +183,31 @@ def run_reaction_dynamic(
         )
         plant_result["final"] = tocomo_result.get("final", {})
     
+    # Save reports to the session directory
+    if progress_callback is not None:
+        progress_callback(96, 100, "Generating dynamic reports")
+    graph_output_path = session_dir / f"{timestamp}_change_points.png"
+    render_dynamic_reports(
+        dynamic_results,
+        plant_results,
+        dynamic_profile,
+        graph_output_path=str(graph_output_path),
+    )
+    
+    # Save results to Excel
+    if progress_callback is not None:
+        progress_callback(98, 100, "Writing Excel output")
+    excel_path = save_dynamic_excel(
+        dynamic_results,
+        plant_results,
+        session_dir,
+        model_used="TOCOMO dynamic",
+    )
+
     if progress_callback is not None:
         progress_callback(99, 100, "Finalizing outputs")
-
+    
+    print(f"Dynamic TOCOMO results saved to: {session_dir}")
+    print(f"  - Graph: {graph_output_path}")
+    print(f"  - Excel: {excel_path}")
     return dynamic_results

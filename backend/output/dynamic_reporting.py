@@ -79,7 +79,7 @@ def _requested_dynamic_metrics(dynamic_profile: dict[str, object]) -> list[dict[
         if isinstance(inlet_profile, dict):
             for species, points in inlet_profile.items():
                 if points:
-                    inlet_species.add(str(species))
+                    inlet_species.add(str(species).strip().upper())
 
     metrics: list[dict[str, str]] = []
     if want_flow:
@@ -103,14 +103,13 @@ def _requested_dynamic_metrics(dynamic_profile: dict[str, object]) -> list[dict[
             }
         )
 
-    for species in sorted(inlet_species):
-        species_name = species.upper()
+    for species_name in sorted(inlet_species):
         metrics.append(
             {
                 "name": species_name,
-                "merge_col": f"final_{species}",
-                "plant_col": f"inlet_{species}",
-                "storage_col": f"final_{species}",
+                "merge_col": f"final_{species_name}",
+                "plant_col": f"inlet_{species_name}",
+                "storage_col": f"final_{species_name}",
                 "y_label": f"{species_name} concentration",
             }
         )
@@ -247,11 +246,11 @@ def _print_dynamic_merge_table(dynamic_results: list[dict[str, Any]]) -> None:
             "pipe_time_days",
             "pipe_length_m",
             "pipe_diameter_m",
-            "final_h2o",
-            "final_so2",
-            "final_no2",
-            "final_h2s",
-            "final_no",
+            "final_H2O",
+            "final_SO2",
+            "final_NO2",
+            "final_H2S",
+            "final_NO",
         ],
         numeric_cols=[
             "temperature_celsius",
@@ -260,11 +259,11 @@ def _print_dynamic_merge_table(dynamic_results: list[dict[str, Any]]) -> None:
             "pipe_time_days",
             "pipe_length_m",
             "pipe_diameter_m",
-            "final_h2o",
-            "final_so2",
-            "final_no2",
-            "final_h2s",
-            "final_no",
+            "final_H2O",
+            "final_SO2",
+            "final_NO2",
+            "final_H2S",
+            "final_NO",
         ],
     )
 
@@ -278,11 +277,11 @@ def _print_dynamic_merge_table(dynamic_results: list[dict[str, Any]]) -> None:
             "pipe_time_days",
             "pipe_length_m",
             "pipe_diameter_m",
-            "final_h2o",
-            "final_so2",
-            "final_no2",
-            "final_h2s",
-            "final_no",
+            "final_H2O",
+            "final_SO2",
+            "final_NO2",
+            "final_H2S",
+            "final_NO",
         ],
     )
 
@@ -321,13 +320,13 @@ def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
             "pipe_time_days",
             "pipe_length_m",
             "pipe_diameter_m",
-            "inlet_o2",
-            "inlet_h2o",
-            "inlet_so2",
-            "inlet_no2",
-            "inlet_no",
-            "inlet_so3",
-            "inlet_h2s",
+            "inlet_O2",
+            "inlet_H2O",
+            "inlet_SO2",
+            "inlet_NO2",
+            "inlet_NO",
+            "inlet_SO3",
+            "inlet_H2S",
         ],
         numeric_cols=[
             "temperature_celsius",
@@ -336,13 +335,13 @@ def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
             "pipe_time_days",
             "pipe_length_m",
             "pipe_diameter_m",
-            "inlet_o2",
-            "inlet_h2o",
-            "inlet_so2",
-            "inlet_no2",
-            "inlet_no",
-            "inlet_so3",
-            "inlet_h2s",
+            "inlet_O2",
+            "inlet_H2O",
+            "inlet_SO2",
+            "inlet_NO2",
+            "inlet_NO",
+            "inlet_SO3",
+            "inlet_H2S",
         ],
     )
 
@@ -356,13 +355,13 @@ def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
             "pipe_time_days",
             "pipe_length_m",
             "pipe_diameter_m",
-            "inlet_o2",
-            "inlet_h2o",
-            "inlet_so2",
-            "inlet_no2",
-            "inlet_no",
-            "inlet_so3",
-            "inlet_h2s",
+            "inlet_O2",
+            "inlet_H2O",
+            "inlet_SO2",
+            "inlet_NO2",
+            "inlet_NO",
+            "inlet_SO3",
+            "inlet_H2S",
         ],
     )
 
@@ -379,13 +378,13 @@ def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
             "temperature_celsius",
             "flow_kg_per_h",
             "pipe_time_days",
-            "inlet_o2",
-            "inlet_h2o",
-            "inlet_so2",
-            "inlet_no2",
-            "inlet_no",
-            "inlet_so3",
-            "inlet_h2s",
+            "inlet_O2",
+            "inlet_H2O",
+            "inlet_SO2",
+            "inlet_NO2",
+            "inlet_NO",
+            "inlet_SO3",
+            "inlet_H2S",
         ]
         table_cols = [col for col in table_cols if col in plant_group.columns]
         print(plant_group[table_cols].to_string(index=False))
@@ -555,7 +554,13 @@ def _ensure_merge_metric_column(merge_table: pd.DataFrame, value_col: str) -> pd
     if value_col.startswith("final_") and "final" in resolved.columns:
         species = value_col[len("final_"):]
         resolved[value_col] = resolved["final"].apply(
-            lambda payload: payload.get(species) if isinstance(payload, dict) else None
+            lambda payload: (
+                payload.get(species)
+                if isinstance(payload, dict) and species in payload
+                else payload.get(str(species).upper())
+                if isinstance(payload, dict)
+                else None
+            )
         )
 
     return resolved
@@ -887,16 +892,15 @@ def _infer_all_metrics(
                 inlet_species.add(key[len("inlet_"):])
 
     # Build one metric per species (union of output and inlet species)
-    all_species = sorted(output_species | inlet_species)
+    all_species = sorted({str(species).upper() for species in output_species | inlet_species})
     for species in all_species:
-        species_upper = species.upper()
         metrics.append(
             {
-                "name": species_upper,
+                "name": species,
                 "merge_col": f"final_{species}",
                 "plant_col": f"inlet_{species}",
                 "storage_col": f"final_{species}",
-                "y_label": f"{species_upper} (ppm)",
+                "y_label": f"{species} (ppm)",
             }
         )
 

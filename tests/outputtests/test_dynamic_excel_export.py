@@ -16,7 +16,7 @@ def test_save_dynamic_excel_storage_uses_time_days(tmp_path: Path):
             "stream_phase": "gas",
             "density_kg_per_m3": 1.0,
             "pipe_time_days": 40.0,
-            "final": {"no2": 1.5},
+            "final": {"NO2": 1.5},
         },
         {
             "time_days": 2.0,
@@ -27,7 +27,7 @@ def test_save_dynamic_excel_storage_uses_time_days(tmp_path: Path):
             "stream_phase": "gas",
             "density_kg_per_m3": 1.1,
             "pipe_time_days": 40.0,
-            "final": {"no2": 2.5},
+            "final": {"NO2": 2.5},
         },
     ]
 
@@ -39,8 +39,8 @@ def test_save_dynamic_excel_storage_uses_time_days(tmp_path: Path):
             "flow_kg_per_h": 100.0,
             "stream_phase": "gas",
             "density_kg_per_m3": 1.0,
-            "inlet_no2": 1.5,
-            "final": {"no2": 1.0},
+            "inlet_NO2": 1.5,
+            "final": {"NO2": 1.0},
         }
     ]
 

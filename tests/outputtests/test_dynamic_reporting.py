@@ -20,7 +20,7 @@ def _sample_dynamic_results() -> list[dict]:
             "density_kg_per_m3": 1.8,
             "pipe_time_days": 2.0,
             "acoustic_pipe_time_days": 0.0,
-            "final": {"so2": 1.0, "no2": 0.5},
+            "final": {"SO2": 1.0, "NO2": 0.5},
         },
         {
             "time_days": 1.0,
@@ -32,7 +32,7 @@ def _sample_dynamic_results() -> list[dict]:
             "density_kg_per_m3": 1.9,
             "pipe_time_days": 2.0,
             "acoustic_pipe_time_days": 0.0,
-            "final": {"so2": 2.0, "no2": 0.5},
+            "final": {"SO2": 2.0, "NO2": 0.5},
         },
         {
             "time_days": 0.0,
@@ -44,7 +44,7 @@ def _sample_dynamic_results() -> list[dict]:
             "density_kg_per_m3": 2.0,
             "pipe_time_days": 3.0,
             "acoustic_pipe_time_days": 0.2,
-            "final": {"so2": 3.0, "no2": 0.2},
+            "final": {"SO2": 3.0, "NO2": 0.2},
         },
         {
             "time_days": 1.0,
@@ -56,7 +56,7 @@ def _sample_dynamic_results() -> list[dict]:
             "density_kg_per_m3": 2.0,
             "pipe_time_days": 3.0,
             "acoustic_pipe_time_days": 0.2,
-            "final": {"so2": 4.0, "no2": 0.2},
+            "final": {"SO2": 4.0, "NO2": 0.2},
         },
     ]
 
@@ -73,8 +73,8 @@ def _sample_plant_results() -> list[dict]:
             "pipe_time_days": 1.0,
             "pipe_length_m": 100.0,
             "pipe_diameter_m": 0.5,
-            "inlet_so2": 1.0,
-            "inlet_no2": 0.5,
+            "inlet_SO2": 1.0,
+            "inlet_NO2": 0.5,
         },
         {
             "time_days": 1.0,
@@ -86,8 +86,8 @@ def _sample_plant_results() -> list[dict]:
             "pipe_time_days": 1.0,
             "pipe_length_m": 100.0,
             "pipe_diameter_m": 0.5,
-            "inlet_so2": 2.0,
-            "inlet_no2": 0.5,
+            "inlet_SO2": 2.0,
+            "inlet_NO2": 0.5,
         },
     ]
 
@@ -104,7 +104,7 @@ def test_requested_dynamic_metrics_extracts_flow_temp_and_species():
             "Plant 1": {
                 "flowrate": [(0, 1.0)],
                 "temperature_celsius": [(0, 20.0)],
-                "inlet_conc": {"so2": [(0, 1.0)], "no2": []},
+                "inlet_conc": {"SO2": [(0, 1.0)], "NO2": []},
             }
         }
     }
@@ -159,9 +159,9 @@ def test_format_change_annotation_includes_time_only():
 
 
 def test_ensure_merge_metric_column_derives_from_final_payload():
-    table = pd.DataFrame([{"final": {"so2": 4.2}}])
-    resolved = dynamic_reporting._ensure_merge_metric_column(table, "final_so2")
-    assert float(resolved.iloc[0]["final_so2"]) == pytest.approx(4.2)
+    table = pd.DataFrame([{"final": {"SO2": 4.2}}])
+    resolved = dynamic_reporting._ensure_merge_metric_column(table, "final_SO2")
+    assert float(resolved.iloc[0]["final_SO2"]) == pytest.approx(4.2)
 
 
 def test_build_storage_receipt_table_finds_terminal_merges_and_snaps_time():
@@ -200,7 +200,7 @@ def test_storage_receipt_concentration_uses_fluid_delay():
             "time_days": 2.0,
             "merge_name": "Terminal",
             "sources": "0",
-            "final_no2": 7.0,
+            "final_NO2": 7.0,
             "pipe_time_days": 5.0,
             "acoustic_pipe_time_days": 0.0,
         }
@@ -208,7 +208,7 @@ def test_storage_receipt_concentration_uses_fluid_delay():
 
     table = dynamic_reporting._build_storage_receipt_table_for_column(
         dynamic_results,
-        value_col="final_no2",
+        value_col="final_NO2",
         dt_days=1.0,
     )
 
@@ -243,15 +243,15 @@ def test_infer_all_metrics_collects_union_of_inlet_and_output_species():
 def test_metric_has_changes_detects_change_and_no_change():
     metric = {
         "name": "SO2",
-        "merge_col": "final_so2",
-        "plant_col": "inlet_so2",
-        "storage_col": "final_so2",
+        "merge_col": "final_SO2",
+        "plant_col": "inlet_SO2",
+        "storage_col": "final_SO2",
         "y_label": "SO2",
     }
     assert dynamic_reporting._metric_has_changes(_sample_dynamic_results(), _sample_plant_results(), metric)
 
-    static_dynamic = [{**r, "final": {"so2": 1.0}} for r in _sample_dynamic_results()]
-    static_plants = [{**r, "inlet_so2": 1.0} for r in _sample_plant_results()]
+    static_dynamic = [{**r, "final": {"SO2": 1.0}} for r in _sample_dynamic_results()]
+    static_plants = [{**r, "inlet_SO2": 1.0} for r in _sample_plant_results()]
     assert not dynamic_reporting._metric_has_changes(static_dynamic, static_plants, metric)
 
 

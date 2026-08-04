@@ -40,14 +40,15 @@ def build_merge_inputs_from_definitions(
                     raise ValueError(f"Merge '{merge_name}' depends on unknown merge '{source_value}'.")
 
                 # Reuse the computed merge output as an input source dict.
+                merge_source = resolved_merges[source_value]
                 source_dicts.append(
                     {
                         "source_type": "merge",
                         "source_name": source_value,
-                        "temperature_kelvin": resolved_merges[source_value]["temperature_kelvin"],
-                        "total_massflow": resolved_merges[source_value]["total_massflow"],
-                        "stream_phase": resolved_merges[source_value]["stream_phase"],
-                        "initial_merge_conc": resolved_merges[source_value]["initial_merge_conc"],
+                        "temperature_kelvin": merge_source["temperature_kelvin"],
+                        "total_massflow": merge_source["total_massflow"],
+                        "stream_phase": merge_source["stream_phase"],
+                        "initial_merge_conc": merge_source["initial_merge_conc"],
                     }
                 )
                 continue

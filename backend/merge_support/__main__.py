@@ -1,18 +1,10 @@
 """Debug and test entry point for merge_support module.
 
-Run with: python -m merge_support
+Run with: python -m backend.merge_support
 Displays the active input configuration with enriched merge pipe metrics.
 """
 
 from pprint import pprint
-
-from pathlib import Path
-import sys
-
-# Support direct execution: python merge_support/__main__.py
-PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
 
 from backend.user_inputs import get_input_config
 from backend.merge_support import (

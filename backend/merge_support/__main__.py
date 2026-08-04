@@ -4,6 +4,8 @@ Run with: python -m backend.merge_support
 Displays the active input configuration with enriched merge pipe metrics.
 """
 
+from pprint import pprint
+
 from backend.user_inputs import get_input_config
 from backend.merge_support import (
     build_merge_definitions,
@@ -40,8 +42,15 @@ def _build_config_with_merge_metrics(input_config: dict[str, object]) -> dict[st
 
 
 def run_merge_support() -> None:
+    print("merge_support loaded.")
+    print("Active input config (from input_config.json unless overridden):")
     input_config = get_input_config()
-    _build_config_with_merge_metrics(input_config)
+    pprint(_build_config_with_merge_metrics(input_config))
+    print("Available functions:")
+    print("- build_merge_definitions")
+    print("- build_merge_input")
+    print("- build_merge_inputs_from_definitions")
+    print("- build_merge_inputs_from_pipe_graph")
 
 
 if __name__ == "__main__":

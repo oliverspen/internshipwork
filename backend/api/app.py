@@ -1,6 +1,5 @@
 """FastAPI application entry point."""
 
-import logging
 import os
 
 import pyvis
@@ -12,8 +11,6 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from .routers import config, maps, results, simulation
-
-logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Pipeline Simulation API",
@@ -39,22 +36,19 @@ if _lib_dir.is_dir() and os.access(_lib_dir, os.R_OK):
     try:
         app.mount("/lib", StaticFiles(directory=str(_lib_dir)), name="lib")
     except PermissionError:
-        logger.warning("Unable to mount /lib because %s is not readable", str(_lib_dir))
+        print(f"WARNING: unable to mount /lib because {str(_lib_dir)} is not readable")
 else:
     if _lib_dir.exists():
-        logger.warning("Unable to mount /lib because %s is not a readable directory", str(_lib_dir))
+        print(f"WARNING: unable to mount /lib because {str(_lib_dir)} is not a readable directory")
     else:
         pyvis_lib_dir = Path(pyvis.__file__).resolve().parent / "lib"
         if pyvis_lib_dir.is_dir() and os.access(pyvis_lib_dir, os.R_OK):
             try:
                 app.mount("/lib", StaticFiles(directory=str(pyvis_lib_dir)), name="lib")
             except PermissionError:
-                logger.warning("Unable to mount /lib because %s is not readable", str(pyvis_lib_dir))
+                print(f"WARNING: unable to mount /lib because {str(pyvis_lib_dir)} is not readable")
         else:
-            logger.warning(
-                "Unable to mount /lib because pyvis lib directory %s is unavailable",
-                str(pyvis_lib_dir),
-            )
+            print(f"WARNING: unable to mount /lib because pyvis lib directory {str(pyvis_lib_dir)} is unavailable")
 
 # Serve the frontend.
 _static_dir = Path(__file__).resolve().parents[2] / "frontend" / "static"

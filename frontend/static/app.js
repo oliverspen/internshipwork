@@ -999,7 +999,6 @@ function _escAttrMultiline(text) {
 }
 
 const _savedMapLastLayoutByMap = new Map();
-const _savedMapManualPositionsByMap = new Map();
 
 function _topoSortNodes(nodeIds, edges) {
   const incoming = new Map(nodeIds.map(id => [id, 0]));
@@ -1451,9 +1450,6 @@ function resetMapPreviewView() {
 
 function resetMapPreviewNodes() {
   if (!_mapPreviewGraphState?.originalPositions) return;
-  if (_mapPreviewGraphState?.mapName) {
-    _savedMapManualPositionsByMap.delete(_mapPreviewGraphState.mapName);
-  }
   _mapPreviewGraphState.positions = Object.fromEntries(
     Object.entries(_mapPreviewGraphState.originalPositions).map(([id, p]) => [id, { x: p.x, y: p.y }]),
   );
@@ -1555,14 +1551,6 @@ function enableMapPreviewInteractions() {
   });
 
   window.addEventListener('mouseup', () => {
-    if (nodeDragging && _mapPreviewGraphState?.mapName) {
-      _savedMapManualPositionsByMap.set(
-        _mapPreviewGraphState.mapName,
-        Object.fromEntries(
-          Object.entries(_mapPreviewGraphState.positions || {}).map(([id, p]) => [id, { x: p.x, y: p.y }]),
-        ),
-      );
-    }
     nodeDragging = null;
     dragging = false;
     svg.style.cursor = 'grab';
@@ -1679,35 +1667,20 @@ function renderMapPreview(
   const width = Math.max(780, (maxX - minX) * xScale + xPad * 2 + 80);
   const height = Math.max(520, (maxAbsY * 2) * yScale + yPad * 2 + 80);
   const positions = {};
-  const autoPositions = {};
 
   Object.entries(layoutUnits).forEach(([id, p]) => {
-    autoPositions[id] = {
+    positions[id] = {
       x: xPad + (p.x - minX) * xScale,
       y: (height / 2) - p.y * yScale,
     };
   });
-
-  Object.entries(autoPositions).forEach(([id, p]) => {
-    positions[id] = { x: p.x, y: p.y };
-  });
-
-  const manualPositions = _savedMapManualPositionsByMap.get(mapName);
-  if (manualPositions && typeof manualPositions === 'object') {
-    Object.entries(manualPositions).forEach(([id, p]) => {
-      if (!positions[id]) return;
-      if (!p || !Number.isFinite(Number(p.x)) || !Number.isFinite(Number(p.y))) return;
-      positions[id] = { x: Number(p.x), y: Number(p.y) };
-    });
-  }
 
   _mapPreviewGraphState = {
     mapName,
     nodes,
     edges,
     positions,
-    // Keep the auto-layout baseline so Reset Nodes can always return to generated positions.
-    originalPositions: Object.fromEntries(Object.entries(autoPositions).map(([id, p]) => [id, { x: p.x, y: p.y }])),
+    originalPositions: Object.fromEntries(Object.entries(positions).map(([id, p]) => [id, { x: p.x, y: p.y }])),
     nodeTooltipById,
     edgeTooltipBySourceId,
     nodeWidth: 76,

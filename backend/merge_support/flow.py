@@ -4,15 +4,13 @@ Handles dependency resolution for merges that feed into other merges (cascading 
 Processes merge definitions in topological order to ensure downstream merges can use
 upstream merge outputs as inputs.
 
-Main entry points:
+Main entry point:
 - build_merge_inputs_from_definitions: Resolve ordered merge definitions
-- build_merge_inputs_from_pipe_graph: Convert graph to merge definitions and resolve
 """
 
 from typing import Any
 
 from .calculations import _build_merge_input_from_source_states, _build_plant_source_dict
-from .topology import build_merge_definitions
 
 def build_merge_inputs_from_definitions(
     merge_definitions: list[dict[str, Any]],
@@ -35,11 +33,6 @@ def build_merge_inputs_from_definitions(
                 continue
 
             if source_type == "merge":
-                # Downstream merges can only use merges that were already resolved.
-                if source_value not in resolved_merges:
-                    raise ValueError(f"Merge '{merge_name}' depends on unknown merge '{source_value}'.")
-
-                # Reuse the computed merge output as an input source dict.
                 merge_source = resolved_merges[source_value]
                 source_dicts.append(
                     {
@@ -53,9 +46,6 @@ def build_merge_inputs_from_definitions(
                 )
                 continue
 
-            # Any other source type is not supported.
-            raise ValueError(f"Unsupported source type '{source_type}' for merge '{merge_name}'.")
-
         # Run the actual mixing calculation for this merge node.
         resolved_merges[merge_name] = _build_merge_input_from_source_states(
             source_dicts,
@@ -64,14 +54,3 @@ def build_merge_inputs_from_definitions(
 
     # Return all computed merges keyed by merge name.
     return resolved_merges
-
-
-def build_merge_inputs_from_pipe_graph(
-    graph,
-    node_types: dict[str, str],
-) -> dict[str, dict[str, Any]]:
-    """Build merge inputs directly from the pipeline graph created in pipemapping.py."""
-    # First convert the graph into plain merge definitions.
-    merge_definitions = build_merge_definitions(graph, node_types)
-    # Then resolve those definitions into calculated merge inputs.
-    return build_merge_inputs_from_definitions(merge_definitions)

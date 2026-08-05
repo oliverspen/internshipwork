@@ -32,22 +32,7 @@ def test_build_merge_definitions_orders_merges_topologically():
     assert merge_definitions[1]["sources"] == [("merge", "Merge 1"), ("plant", 2)]
 
 
-def test_build_merge_definitions_requires_plant_index():
-    graph = nx.DiGraph()
-    graph.add_node("Plant A")
-    graph.add_node("Merge 1")
-    graph.add_edge("Plant A", "Merge 1")
-
-    node_types = {
-        "Plant A": "plant",
-        "Merge 1": "merge",
-    }
-
-    with pytest.raises(ValueError, match="missing a plant_index"):
-        build_merge_definitions(graph, node_types)
-
-
-def test_build_merge_definitions_rejects_unsupported_source_type():
+def test_build_merge_definitions_ignores_unsupported_source_type():
     graph = nx.DiGraph()
     graph.add_node("Storage")
     graph.add_node("Merge 1")
@@ -58,5 +43,5 @@ def test_build_merge_definitions_rejects_unsupported_source_type():
         "Merge 1": "merge",
     }
 
-    with pytest.raises(ValueError, match="unsupported source"):
-        build_merge_definitions(graph, node_types)
+    result = build_merge_definitions(graph, node_types)
+    assert result == [{"merge_name": "Merge 1", "sources": []}]

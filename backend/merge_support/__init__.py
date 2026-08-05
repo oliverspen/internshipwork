@@ -14,12 +14,11 @@ Public API:
 - build_merge_definitions: Convert graph topology to merge definitions
 - build_merge_input: Calculate single merge from plant streams
 - build_merge_inputs_from_definitions: Resolve ordered merge definitions
-- build_merge_inputs_from_pipe_graph: Convert graph directly to merge inputs
 - run_merge_support: Display merge calculations for debugging
 """
 
 from .calculations import build_merge_input
-from .flow import build_merge_inputs_from_definitions, build_merge_inputs_from_pipe_graph
+from .flow import build_merge_inputs_from_definitions
 from .topology import build_merge_definitions
 from backend.user_inputs import get_input_config
 
@@ -44,6 +43,5 @@ __all__ = [
     "build_merge_definitions",
     "build_merge_input",
     "build_merge_inputs_from_definitions",
-    "build_merge_inputs_from_pipe_graph",
     "run_merge_support",
 ]

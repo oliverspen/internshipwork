@@ -217,6 +217,29 @@ select:focus { outline: none; border-color: #3182ce; background: white; }
   position: relative;
 }
 
+.map-loading-wrap {
+  width: 100%;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-loading-btn {
+  background: #edf2f7;
+  color: #2d3748;
+  border: 1px solid #cbd5e0;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+  cursor: default;
+}
+
+.spinner-dark {
+  border-color: rgba(45, 55, 72, 0.25);
+  border-top-color: #2d3748;
+}
+
 .dynamic-graphs-wrap {
   display: flex;
   flex-direction: column;

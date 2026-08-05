@@ -9,6 +9,34 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+function _isTransientFetchError(error) {
+  const msg = String(error?.message || error || '');
+  return /Failed to fetch|NetworkError|Load failed/i.test(msg);
+}
+
+function _waitMs(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function _loadMapAndConfigWithRetry(mapName, maxRetries = 2) {
+  let attempt = 0;
+  while (true) {
+    try {
+      const encoded = encodeURIComponent(mapName);
+      return await Promise.all([
+        api(`/api/maps/${encoded}`),
+        api('/api/config/'),
+      ]);
+    } catch (error) {
+      if (!_isTransientFetchError(error) || attempt >= maxRetries) {
+        throw error;
+      }
+      attempt += 1;
+      await _waitMs(250 * attempt);
+    }
+  }
+}
+
 function _extractApiErrorMessage(body, fallback = 'Request failed') {
   if (!body || typeof body !== 'object') return String(fallback || 'Request failed');
 
@@ -261,11 +289,10 @@ async function onMapSelectionChange() {
     return;
   }
 
+  showMapLoading(`Loading interactive pipeline map: ${mapName}...`);
+
   try {
-    const [mapData, cfg] = await Promise.all([
-      api(`/api/maps/${encodeURIComponent(mapName)}`),
-      api('/api/config/'),
-    ]);
+    const [mapData, cfg] = await _loadMapAndConfigWithRetry(mapName);
     const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
     _currentPlantInputs = plantInputs;
     renderMapPreview(mapName, mapData, plantInputs, null, 'Previewing saved map', { interactive: true });
@@ -305,6 +332,13 @@ async function loadSessions() {
             ${Array.isArray(s.graph_urls) && s.graph_urls.length
               ? `<a class="btn btn-sm link" href="${s.graph_urls[0]}" target="_blank">Graph</a>`
               : ''}
+            ${s.phase_envelope_zip_url
+              ? `<a class="btn btn-sm link" href="${s.phase_envelope_zip_url}" download>Phase Envelopes ZIP</a>`
+              : (s.phase_envelope_folder_url
+                ? `<a class="btn btn-sm link" href="${s.phase_envelope_folder_url}" target="_blank">Phase Envelopes Folder</a>`
+                : (Array.isArray(s.phase_envelope_urls) && s.phase_envelope_urls.length
+                  ? `<a class="btn btn-sm link" href="${s.phase_envelope_urls[0]}" target="_blank">Phase Envelope</a>`
+                  : ''))}
             ${s.html_url
               ? `<a class="btn btn-sm link" href="${s.html_url}" download>Download Interactive Map</a>`
               : ''}
@@ -699,10 +733,8 @@ async function _run(model, mapName) {
       renderDynamicGraphs(result.graph_urls || [], mapName);
       hideResultsSummary();
     } else {
-      const [mapData, cfg] = await Promise.all([
-        api(`/api/maps/${encodeURIComponent(mapName)}`),
-        api('/api/config/'),
-      ]);
+      showMapLoading(`Loading interactive pipeline map: ${mapName}...`);
+      const [mapData, cfg] = await _loadMapAndConfigWithRetry(mapName);
       const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
       _currentPlantInputs = plantInputs;
       renderMapPreview(
@@ -838,6 +870,26 @@ function hideResultsSummary() {
   }
   if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
   if (card) card.style.display = 'none';
+}
+
+function showMapLoading(message = 'Loading interactive pipeline map...') {
+  const placeholder = document.getElementById('map-placeholder');
+  const frame = document.getElementById('map-frame');
+  if (!placeholder || !frame) return;
+
+  setMapPanelTitle('Interactive Pipeline Map');
+  frame.style.display = 'none';
+  frame.src = 'about:blank';
+  placeholder.className = '';
+  placeholder.innerHTML = `
+    <div class="map-loading-wrap">
+      <button class="btn map-loading-btn" type="button" disabled>
+        <span class="spinner spinner-dark" aria-hidden="true"></span>
+        ${_esc(message)}
+      </button>
+    </div>
+  `;
+  placeholder.style.display = 'block';
 }
 
 function showMapPreviewMessage(message) {
@@ -1438,6 +1490,7 @@ function enableMapPreviewInteractions() {
           startClientY: event.clientY,
           startX: _mapPreviewGraphState.positions[nodeId].x,
           startY: _mapPreviewGraphState.positions[nodeId].y,
+          moved: false,
         };
         svg.style.cursor = 'grabbing';
         event.preventDefault();
@@ -1471,6 +1524,9 @@ function enableMapPreviewInteractions() {
       if (!vb || !svg.clientWidth || !svg.clientHeight) return;
       const dx = event.clientX - nodeDragging.startClientX;
       const dy = event.clientY - nodeDragging.startClientY;
+      if (!nodeDragging.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        nodeDragging.moved = true;
+      }
       const scaleX = vb.width / svg.clientWidth;
       const scaleY = vb.height / svg.clientHeight;
       const nx = nodeDragging.startX + (dx * scaleX) / _mapPreviewZoom;
@@ -1498,11 +1554,15 @@ function enableMapPreviewInteractions() {
 
   window.addEventListener('mouseup', () => {
     if (nodeDragging && _mapPreviewGraphState?.viewport) {
-      const layoutUnits = _screenPositionsToLayoutUnits(_mapPreviewGraphState.positions, _mapPreviewGraphState.viewport);
-      _mapPreviewGraphState.layoutUnits = layoutUnits;
-      _savedMapManualLayoutByMap.set(_mapPreviewGraphState.mapName, _cloneLayoutUnits(layoutUnits));
-      _savedMapLastLayoutByMap.set(_mapPreviewGraphState.mapName, _cloneLayoutUnits(layoutUnits));
-      _schedulePersistMapLayout(_mapPreviewGraphState.mapName, layoutUnits);
+      if (nodeDragging.moved) {
+        const layoutUnits = _screenPositionsToLayoutUnits(_mapPreviewGraphState.positions, _mapPreviewGraphState.viewport);
+        _mapPreviewGraphState.layoutUnits = layoutUnits;
+        _savedMapManualLayoutByMap.set(_mapPreviewGraphState.mapName, _cloneLayoutUnits(layoutUnits));
+        _savedMapLastLayoutByMap.set(_mapPreviewGraphState.mapName, _cloneLayoutUnits(layoutUnits));
+        _schedulePersistMapLayout(_mapPreviewGraphState.mapName, layoutUnits);
+      } else {
+        void openConfigEditorForMapNode(nodeDragging.nodeId);
+      }
     }
     nodeDragging = null;
     dragging = false;
@@ -1715,11 +1775,9 @@ async function previewSelectedMap() {
     showMapPreviewMessage('Select a pipeline map to preview it here.');
     return;
   }
+  showMapLoading(`Loading interactive pipeline map: ${mapName}...`);
   try {
-    const [mapData, cfg] = await Promise.all([
-      api(`/api/maps/${encodeURIComponent(mapName)}`),
-      api('/api/config/'),
-    ]);
+    const [mapData, cfg] = await _loadMapAndConfigWithRetry(mapName);
     const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
     _currentPlantInputs = plantInputs;
     renderMapPreview(mapName, mapData, plantInputs, null, 'Previewing saved map', { interactive: true });
@@ -2152,6 +2210,58 @@ async function openConfigEditor() {
   openModal('config-modal');
 }
 
+function _focusConfigEditorForNode(nodeId) {
+  const raw = String(nodeId || '');
+  if (!raw.includes(':')) return;
+
+  const [nodeType, ...rest] = raw.split(':');
+  const nodeValue = rest.join(':');
+  if (!nodeType || !nodeValue) return;
+
+  if (nodeType === 'plant') {
+    const idx = Number(nodeValue);
+    if (!Number.isFinite(idx) || idx < 0) return;
+    const body = document.getElementById(`plant-body-${idx}`);
+    if (body && !body.classList.contains('open')) body.classList.add('open');
+
+    const targetInput = document.querySelector(`[data-pi="${idx}"][data-f="name"]`)
+      || document.querySelector(`[data-pi="${idx}"][data-f="flowrate"]`);
+    if (targetInput) {
+      targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetInput.focus();
+    }
+    return;
+  }
+
+  if (nodeType === 'merge') {
+    const mergeNameInputs = Array.from(document.querySelectorAll('.merge-name'));
+    const targetInput = mergeNameInputs.find(el => el.dataset.mkey === nodeValue);
+    if (!targetInput) return;
+
+    const mergeIndex = mergeNameInputs.indexOf(targetInput);
+    if (mergeIndex >= 0) {
+      const body = document.getElementById(`merge-body-${mergeIndex}`);
+      if (body && !body.classList.contains('open')) body.classList.add('open');
+    }
+    targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetInput.focus();
+    return;
+  }
+
+  if (nodeType === 'storage') {
+    const storageInput = document.getElementById('cfg-storage-name');
+    if (storageInput) {
+      storageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      storageInput.focus();
+    }
+  }
+}
+
+async function openConfigEditorForMapNode(nodeId) {
+  await openConfigEditor();
+  _focusConfigEditorForNode(nodeId);
+}
+
 function renderConfigEditor() {
   document.getElementById('cfg-p-bara').value = _cfg.p_bara ?? '';
   document.getElementById('cfg-storage-name').value = _cfg.storage_name ?? 'Storage';
@@ -2384,6 +2494,7 @@ const MB = {
   _editingMapName: null,
   plants: [],
   merges: [],
+  editMergeIndex: -1,
   availableNodes: [],
   storageName: 'Storage',
   _savedNodePositions: {},
@@ -2404,6 +2515,7 @@ async function openMapBuilder() {
   MB._editingMapName = null;
   MB.plants = [];
   MB.merges = [];
+  MB.editMergeIndex = -1;
   MB.availableNodes = [];
   MB._savedNodePositions = {};
   MB._lastLayout = null;
@@ -2448,6 +2560,7 @@ async function openMapEditor() {
         pipediameter: Number(configured?.pipediameter ?? 0.5),
       };
     });
+    MB.editMergeIndex = -1;
     MB.availableNodes = [];
     MB._savedNodePositions = _cloneLayoutUnits(mapData?.node_positions || {});
     MB._lastLayout = null;
@@ -2554,11 +2667,36 @@ function renderMBStep2() {
   const mergeList = MB.merges.length
     ? MB.merges.map((m, i) => `
         <div class="merge-def-row">
-          <div>
+          <div style="flex:1">
             <span class="merge-def-name">${m.merge_name}</span>
             <span class="merge-def-meta"> ← ${m.sources.map(s=>s[1]).join(', ')} · ${m.pipelength} m · ⌀${m.pipediameter} m</span>
+            ${MB.editMergeIndex === i ? `
+              <div style="margin-top:.55rem;padding:.65rem;background:#edf2f7;border:1px solid #e2e8f0;border-radius:8px">
+                <div class="section-label" style="margin-top:0">Edit sources (select >= 2)</div>
+                ${MB.availableNodes
+                  .filter(n => n.id !== m.merge_name)
+                  .map(n => {
+                    const checked = (m.sources || []).some(([srcType, srcValue]) =>
+                      (srcType === 'plant' && n.type === 'plant' && MB._plants[srcValue]?.name === n.id)
+                      || (srcType === 'merge' && n.type === 'merge' && String(srcValue) === String(n.id))
+                    );
+                    return `
+                      <label style="display:flex;align-items:center;gap:.5rem;padding:.22rem 0;cursor:pointer">
+                        <input type="checkbox" name="mb-edit-src-${i}" value="${_esc(n.id)}" data-type="${_esc(n.type)}" ${checked ? 'checked' : ''}>
+                        <span class="chip chip-${n.type}" style="pointer-events:none">${_esc(n.id)}</span>
+                      </label>`;
+                  }).join('')}
+                <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem">
+                  <button class="btn btn-sm" type="button" onclick="saveMBMergeEdit(${i})">Save</button>
+                  <button class="btn btn-sm" type="button" onclick="cancelMBMergeEdit()">Cancel</button>
+                </div>
+              </div>
+            ` : ''}
           </div>
-          <button class="btn btn-sm" style="background:#fff5f5;color:#c53030" onclick="removeMBMerge(${i})">✕</button>
+          <div style="display:flex;gap:.35rem;align-items:flex-start">
+            <button class="btn btn-sm" type="button" onclick="startMBMergeEdit(${i})">Edit</button>
+            <button class="btn btn-sm" style="background:#fff5f5;color:#c53030" onclick="removeMBMerge(${i})">✕</button>
+          </div>
         </div>`).join('')
     : '<p style="color:#a0aec0;font-size:.85rem">No merges added yet - click "Add Merge" or skip to save without merges.</p>';
 
@@ -2633,11 +2771,48 @@ function addMBMerge() {
   });
 
   MB.merges.push({ merge_name: name, sources, pipelength: len, pipediameter: diam });
+  MB.editMergeIndex = -1;
   renderMBStep2();
 }
 
 function removeMBMerge(i) {
   MB.merges.splice(i, 1);
+  if (MB.editMergeIndex === i) MB.editMergeIndex = -1;
+  if (MB.editMergeIndex > i) MB.editMergeIndex -= 1;
+  renderMBStep2();
+}
+
+function startMBMergeEdit(i) {
+  MB.editMergeIndex = i;
+  renderMBStep2();
+}
+
+function cancelMBMergeEdit() {
+  MB.editMergeIndex = -1;
+  renderMBStep2();
+}
+
+function saveMBMergeEdit(i) {
+  const merge = MB.merges[i];
+  if (!merge) return;
+
+  const srcs = Array.from(document.querySelectorAll(`input[name="mb-edit-src-${i}"]:checked`)).map(e => ({
+    id: e.value,
+    type: e.dataset.type,
+  }));
+
+  if (srcs.length < 2) { alert('Select at least 2 source nodes.'); return; }
+
+  const sources = srcs.map(src => {
+    if (src.type === 'plant') {
+      const plantIdx = MB._plants.findIndex(p => p.name === src.id);
+      if (plantIdx !== -1 && MB.plants.includes(plantIdx)) return ['plant', plantIdx];
+    }
+    return ['merge', src.id];
+  });
+
+  merge.sources = sources;
+  MB.editMergeIndex = -1;
   renderMBStep2();
 }
 

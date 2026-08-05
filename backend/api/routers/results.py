@@ -1,6 +1,7 @@
 """Results endpoints — browse past simulation sessions and retrieve their outputs."""
 
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
 
@@ -15,6 +16,7 @@ _MODEL_FOLDERS = {
     "tocomo_dynamic": "tocomo_dynamic",
     "phpitz_dynamic": "phpitz_dynamic",
 }
+_PHASE_ENVELOPES_DIRNAME = "phase envelopes"
 
 
 @router.get("/{model}", response_model=list[SessionInfo])
@@ -36,6 +38,9 @@ def list_sessions(model: str) -> list[SessionInfo]:
         summary_excel_path = session_dir / "summary.xlsx"
         dynamic_excel_path = session_dir / "dynamic_results.xlsx"
         graph_files = sorted((session_dir / "graphs").glob("*.png"))
+        phase_envelope_files = sorted((session_dir / _PHASE_ENVELOPES_DIRNAME).glob("*.png"))
+        phase_envelope_index_path = session_dir / _PHASE_ENVELOPES_DIRNAME / "index.html"
+        phase_envelope_zip_path = session_dir / "phase_envelopes.zip"
         pipeline_map_name: str | None = None
         if not pipeline_map_name:
             parts = session_dir.name.split("_", 1)
@@ -51,6 +56,20 @@ def list_sessions(model: str) -> list[SessionInfo]:
                     f"/results/{model_folder}/{session_dir.name}/graphs/{graph_file.name}"
                     for graph_file in graph_files
                 ],
+                phase_envelope_urls=[
+                    f"/results/{model_folder}/{session_dir.name}/{quote(_PHASE_ENVELOPES_DIRNAME)}/{quote(phase_file.name)}"
+                    for phase_file in phase_envelope_files
+                ],
+                phase_envelope_folder_url=(
+                    f"/results/{model_folder}/{session_dir.name}/{quote(_PHASE_ENVELOPES_DIRNAME)}/index.html"
+                    if phase_envelope_index_path.exists()
+                    else None
+                ),
+                phase_envelope_zip_url=(
+                    f"/results/{model_folder}/{session_dir.name}/phase_envelopes.zip"
+                    if phase_envelope_zip_path.exists()
+                    else None
+                ),
                 summary_excel_url=(
                     f"/results/{model_folder}/{session_dir.name}/summary.xlsx"
                     if summary_excel_path.exists()

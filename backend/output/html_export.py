@@ -301,6 +301,7 @@ def save_interactive_html_map(
   }
   .pfd-header {
     margin: 18px 24px 8px 24px;
+    text-align: center;
   }
   .pfd-header h2 {
     margin: 0;
@@ -308,11 +309,18 @@ def save_interactive_html_map(
     font-weight: 700;
     color: #1f3a5f;
     letter-spacing: 0.01em;
+    text-transform: capitalize;
   }
   .pfd-header p {
     margin: 4px 0 0 0;
     font-size: 13px;
     color: #526277;
+  }
+  center > h1:empty {
+    display: none;
+  }
+  center:empty {
+    display: none;
   }
   .card {
     position: relative;

@@ -25,10 +25,16 @@ class MergeDefinition(BaseModel):
     sources: list[tuple[str, int | str]]
 
 
+class NodePosition(BaseModel):
+    x: float
+    y: float
+
+
 class PipelineMap(BaseModel):
     merge_definitions: list[MergeDefinition]
     merge_pipe_inputs: dict[str, MergePipeInput]
     storage_name: str | None = "Storage"
+    node_positions: dict[str, NodePosition] | None = None
 
 
 class SimulationRequest(BaseModel):
@@ -79,3 +85,7 @@ class PipelineMapInfo(BaseModel):
     name: str
     merge_count: int
     merge_names: list[str]
+
+
+class PipelineMapLayoutUpdateRequest(BaseModel):
+    node_positions: dict[str, NodePosition]

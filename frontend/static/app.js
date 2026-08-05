@@ -1219,6 +1219,68 @@ let _mapPreviewPanX = 0;
 let _mapPreviewPanY = 0;
 let _mapPreviewZoom = 1;
 let _mapPreviewGraphState = null;
+const _savedMapManualLayoutByMap = new Map();
+const _layoutPersistTimersByMap = new Map();
+
+function _cloneLayoutUnits(layout) {
+  const out = {};
+  Object.entries(layout || {}).forEach(([id, p]) => {
+    const x = Number(p?.x);
+    const y = Number(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    out[id] = { x, y };
+  });
+  return out;
+}
+
+function _schedulePersistMapLayout(mapName, nodePositions) {
+  const key = String(mapName || '').trim();
+  if (!key) return;
+
+  const existing = _layoutPersistTimersByMap.get(key);
+  if (existing) clearTimeout(existing);
+
+  const layoutToSave = _cloneLayoutUnits(nodePositions);
+  const timer = setTimeout(async () => {
+    _layoutPersistTimersByMap.delete(key);
+    try {
+      await api(`/api/maps/${encodeURIComponent(key)}/layout`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ node_positions: layoutToSave }),
+      });
+    } catch {
+      // Keep UI responsive even if persistence fails; map remains interactive.
+    }
+  }, 180);
+
+  _layoutPersistTimersByMap.set(key, timer);
+}
+
+function _layoutUnitsToScreenPositions(layoutUnits, viewport) {
+  const positions = {};
+  Object.entries(layoutUnits || {}).forEach(([id, p]) => {
+    positions[id] = {
+      x: viewport.xPad + (Number(p.x) - viewport.minX) * viewport.xScale,
+      y: (viewport.height / 2) - Number(p.y) * viewport.yScale,
+    };
+  });
+  return positions;
+}
+
+function _screenPositionsToLayoutUnits(positions, viewport) {
+  const layout = {};
+  Object.entries(positions || {}).forEach(([id, p]) => {
+    const x = Number(p?.x);
+    const y = Number(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    layout[id] = {
+      x: ((x - viewport.xPad) / viewport.xScale) + viewport.minX,
+      y: ((viewport.height / 2) - y) / viewport.yScale,
+    };
+  });
+  return layout;
+}
 
 function _renderEdgePathsFromState(state) {
   if (!state) return '';
@@ -1324,10 +1386,19 @@ function resetMapPreviewView() {
 }
 
 function resetMapPreviewNodes() {
-  if (!_mapPreviewGraphState?.originalPositions) return;
-  _mapPreviewGraphState.positions = Object.fromEntries(
-    Object.entries(_mapPreviewGraphState.originalPositions).map(([id, p]) => [id, { x: p.x, y: p.y }]),
+  if (!_mapPreviewGraphState?.autoLayoutUnits || !_mapPreviewGraphState?.viewport) return;
+  const autoLayout = _cloneLayoutUnits(_mapPreviewGraphState.autoLayoutUnits);
+  const nextPositions = _layoutUnitsToScreenPositions(autoLayout, _mapPreviewGraphState.viewport);
+  _mapPreviewGraphState.layoutUnits = autoLayout;
+  _mapPreviewGraphState.positions = nextPositions;
+  _mapPreviewGraphState.originalPositions = Object.fromEntries(
+    Object.entries(nextPositions).map(([id, p]) => [id, { x: p.x, y: p.y }]),
   );
+
+  _savedMapManualLayoutByMap.delete(_mapPreviewGraphState.mapName);
+  _savedMapLastLayoutByMap.set(_mapPreviewGraphState.mapName, autoLayout);
+  _schedulePersistMapLayout(_mapPreviewGraphState.mapName, {});
+
   _renderInteractiveMapNodesIntoDom();
   _renderInteractiveMapEdges();
 }
@@ -1426,6 +1497,13 @@ function enableMapPreviewInteractions() {
   });
 
   window.addEventListener('mouseup', () => {
+    if (nodeDragging && _mapPreviewGraphState?.viewport) {
+      const layoutUnits = _screenPositionsToLayoutUnits(_mapPreviewGraphState.positions, _mapPreviewGraphState.viewport);
+      _mapPreviewGraphState.layoutUnits = layoutUnits;
+      _savedMapManualLayoutByMap.set(_mapPreviewGraphState.mapName, _cloneLayoutUnits(layoutUnits));
+      _savedMapLastLayoutByMap.set(_mapPreviewGraphState.mapName, _cloneLayoutUnits(layoutUnits));
+      _schedulePersistMapLayout(_mapPreviewGraphState.mapName, layoutUnits);
+    }
     nodeDragging = null;
     dragging = false;
     svg.style.cursor = 'grab';
@@ -1522,12 +1600,25 @@ function renderMapPreview(
     .forEach(node => edges.push([node.id, storageId]));
 
   const previousLayout = _savedMapLastLayoutByMap.get(mapName) || null;
-  const layoutUnits = _computeOverlapAwareLayout(
+  const computedLayoutUnits = _computeOverlapAwareLayout(
     Array.from(nodes.values()),
     edges,
     previousLayout,
   );
-  _savedMapLastLayoutByMap.set(mapName, layoutUnits);
+  const autoLayoutUnits = _cloneLayoutUnits(computedLayoutUnits);
+  const persistedLayout = _savedMapManualLayoutByMap.get(mapName) || _cloneLayoutUnits(mapData?.node_positions || {});
+  const layoutUnits = _cloneLayoutUnits(computedLayoutUnits);
+  Object.entries(persistedLayout || {}).forEach(([id, p]) => {
+    if (!layoutUnits[id]) return;
+    layoutUnits[id] = { x: Number(p.x), y: Number(p.y) };
+  });
+
+  _savedMapLastLayoutByMap.set(mapName, _cloneLayoutUnits(layoutUnits));
+  if (Object.keys(persistedLayout || {}).length) {
+    _savedMapManualLayoutByMap.set(mapName, _cloneLayoutUnits(layoutUnits));
+  } else {
+    _savedMapManualLayoutByMap.delete(mapName);
+  }
 
   const xs = Object.values(layoutUnits).map(p => p.x);
   const ys = Object.values(layoutUnits).map(p => p.y);
@@ -1554,8 +1645,17 @@ function renderMapPreview(
     mapName,
     nodes,
     edges,
+    layoutUnits: _cloneLayoutUnits(layoutUnits),
+    autoLayoutUnits,
     positions,
     originalPositions: Object.fromEntries(Object.entries(positions).map(([id, p]) => [id, { x: p.x, y: p.y }])),
+    viewport: {
+      xScale,
+      yScale,
+      xPad,
+      minX,
+      height,
+    },
     nodeTooltipById,
     edgeTooltipBySourceId,
     nodeWidth: 76,
@@ -2279,31 +2379,87 @@ async function saveConfig() {
 
 const MB = {
   step: 1,
+  mode: 'create',
   name: '',
+  _editingMapName: null,
   plants: [],
   merges: [],
   availableNodes: [],
   storageName: 'Storage',
+  _savedNodePositions: {},
   _manualNodePositions: {},
   _draftGraphState: null,
 };
 
 async function openMapBuilder() {
   const cfg = await api('/api/config/');
+  const titleEl = document.getElementById('map-modal-title');
+  if (titleEl) titleEl.textContent = 'Create Pipeline Map';
   MB._plants = cfg.plant_inputs;
   MB._mergePipeInputs = cfg.merge_pipe_inputs || {};
   MB.storageName = (cfg.storage_name || 'Storage').trim() || 'Storage';
   MB.step = 1;
+  MB.mode = 'create';
   MB.name = '';
+  MB._editingMapName = null;
   MB.plants = [];
   MB.merges = [];
   MB.availableNodes = [];
+  MB._savedNodePositions = {};
   MB._lastLayout = null;
   MB._manualNodePositions = {};
   MB._draftGraphState = null;
   renderMBStep1();
   renderMBDraftReview();
   openModal('map-modal');
+}
+
+async function openMapEditor() {
+  const mapName = (document.getElementById('map-sel')?.value || '').trim();
+  if (!mapName) {
+    alert('Select a pipeline map to edit first.');
+    return;
+  }
+
+  try {
+    const [cfg, mapData] = await Promise.all([
+      api('/api/config/'),
+      api(`/api/maps/${encodeURIComponent(mapName)}`),
+    ]);
+
+    const titleEl = document.getElementById('map-modal-title');
+    if (titleEl) titleEl.textContent = `Edit Pipeline Map: ${mapName}`;
+
+    MB._plants = cfg.plant_inputs;
+    MB._mergePipeInputs = cfg.merge_pipe_inputs || {};
+    MB.storageName = (mapData?.storage_name || cfg.storage_name || 'Storage').trim() || 'Storage';
+    MB.step = 1;
+    MB.mode = 'edit';
+    MB.name = mapName;
+    MB._editingMapName = mapName;
+    MB.plants = _extractPlantIndexesFromMap(mapData, cfg.plant_inputs?.length || 0);
+    MB.merges = (Array.isArray(mapData?.merge_definitions) ? mapData.merge_definitions : []).map(def => {
+      const mergeName = String(def?.merge_name || '').trim();
+      const configured = mapData?.merge_pipe_inputs?.[mergeName] || MB._mergePipeInputs?.[mergeName] || {};
+      return {
+        merge_name: mergeName,
+        sources: Array.isArray(def?.sources) ? def.sources : [],
+        pipelength: Number(configured?.pipelength ?? 10000),
+        pipediameter: Number(configured?.pipediameter ?? 0.5),
+      };
+    });
+    MB.availableNodes = [];
+    MB._savedNodePositions = _cloneLayoutUnits(mapData?.node_positions || {});
+    MB._lastLayout = null;
+    MB._manualNodePositions = {};
+    MB._draftGraphState = null;
+
+    renderMBStep1();
+    renderMBDraftReview();
+    openModal('map-modal');
+  } catch (e) {
+    alert('Could not open map editor: ' + e.message);
+  }
 }
 
 function updateMBPlantsFromStep1() {
@@ -2333,13 +2489,17 @@ function renderMBStep1() {
 
 function renderMBStep3() {
   setWizardStep(3);
+  const mapNameLocked = MB.mode === 'edit' && Boolean(MB._editingMapName);
   document.getElementById('mb-step3').innerHTML = `
     <div class="section-label" style="margin-top:0">Finalize map</div>
     <div class="field-row" style="margin-bottom:1rem">
       <label style="max-width:420px"><span>Map name</span>
-        <input id="mb-name" placeholder="e.g. my_pipeline" value="${_esc(MB.name)}" oninput="MB.name = this.value.trim()">
+        <input id="mb-name" placeholder="e.g. my_pipeline" value="${_esc(MB.name)}" oninput="MB.name = this.value.trim()" ${mapNameLocked ? 'disabled' : ''}>
       </label>
     </div>
+    ${mapNameLocked
+      ? '<div class="empty" style="text-align:left;padding:0 0 .65rem 0;color:#4a5568">Editing existing map. Save will update this map in place.</div>'
+      : ''}
     <div class="section-label" style="margin-top:0">Storage</div>
     <div class="field-row" style="margin-bottom:1rem">
       <label style="max-width:360px"><span>Storage node name</span>
@@ -2539,6 +2699,13 @@ function renderMBDraftReview() {
     edges,
     MB._lastLayout || null,
   );
+  Object.entries(MB._savedNodePositions || {}).forEach(([id, p]) => {
+    if (!layoutUnits[id]) return;
+    const x = Number(p?.x);
+    const y = Number(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    layoutUnits[id] = { x, y };
+  });
   MB._lastLayout = layoutUnits;
 
   const xs = Object.values(layoutUnits).map(p => p.x);
@@ -2756,6 +2923,8 @@ async function saveMBMap() {
   if (!MB.name) { alert('Enter a map name first.'); return; }
   if (!MB.plants.length) { alert('Select at least one plant.'); return; }
 
+  const targetMapName = MB.mode === 'edit' && MB._editingMapName ? MB._editingMapName : MB.name;
+
   const mergeDefinitions = MB.merges.map(m => ({
     merge_name: m.merge_name,
     sources: m.sources,
@@ -2763,14 +2932,24 @@ async function saveMBMap() {
   const mergePipeInputs = Object.fromEntries(
     MB.merges.map(m => [m.merge_name, { pipelength: m.pipelength, pipediameter: m.pipediameter }])
   );
+  const nodePositions = _cloneLayoutUnits(
+    _savedMapManualLayoutByMap.get(targetMapName)
+      || MB._savedNodePositions
+      || {}
+  );
 
   try {
-    await api('/api/maps/', {
-      method: 'POST',
+    await api(MB.mode === 'edit' ? `/api/maps/${encodeURIComponent(targetMapName)}` : '/api/maps/', {
+      method: MB.mode === 'edit' ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: MB.name,
-        pipeline_map: { merge_definitions: mergeDefinitions, merge_pipe_inputs: mergePipeInputs, storage_name: MB.storageName },
+        pipeline_map: {
+          merge_definitions: mergeDefinitions,
+          merge_pipe_inputs: mergePipeInputs,
+          storage_name: MB.storageName,
+          node_positions: nodePositions,
+        },
       }),
     });
     closeModal('map-modal');

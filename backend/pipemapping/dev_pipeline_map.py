@@ -112,6 +112,7 @@ def register_dev_pipeline_map(
     merge_definitions: list[dict[str, object]],
     merge_pipe_inputs: dict[str, dict[str, float]],
     storage_name: str = "Storage",
+    node_positions: dict[str, dict[str, float]] | None = None,
 ) -> None:
     """Store a new named pipeline map and set it as the active default.
     
@@ -127,8 +128,20 @@ def register_dev_pipeline_map(
         "merge_definitions": deepcopy(merge_definitions),
         "merge_pipe_inputs": deepcopy(merge_pipe_inputs),
         "storage_name": (storage_name or "Storage").strip() or "Storage",
+        "node_positions": deepcopy(node_positions) if node_positions else {},
     }
     ACTIVE_AUTO_PIPELINE_MAP = map_name
+    _persist_generated_pipeline_maps()
+
+
+def update_dev_pipeline_map_node_positions(
+    map_name: str,
+    node_positions: dict[str, dict[str, float]],
+) -> None:
+    """Update only saved node positions for an existing map and persist it."""
+    if map_name not in AUTO_GENERATED_PIPELINE_MAPS:
+        raise KeyError(f"Unknown dev pipeline map '{map_name}'.")
+    AUTO_GENERATED_PIPELINE_MAPS[map_name]["node_positions"] = deepcopy(node_positions)
     _persist_generated_pipeline_maps()
 
 

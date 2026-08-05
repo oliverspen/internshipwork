@@ -308,13 +308,13 @@ def test_build_merge_input_two_sources_weighted_mix(monkeypatch: pytest.MonkeyPa
 
     assert merge_dict["sources"] == [0, 1]
     assert merge_dict["stream_phase"] == "liquid"
-    assert merge_dict["total_massflow"] == pytest.approx(150000.0)
+    assert merge_dict["total_massflow"] == 150000.0
     assert merge_dict["temperature_kelvin"] == pytest.approx(306.66667)
     assert merge_dict["density_kg_per_m3"] == pytest.approx(3.48373)
     assert merge_dict["flow_speed"] == pytest.approx(60.91357354857239)
     assert merge_dict["pipe_time"] == pytest.approx(1641.6702251142785)
-    assert merge_dict["pipe_length"] == pytest.approx(100000.0)
-    assert merge_dict["pipe_diameter"] == pytest.approx(0.5)
+    assert merge_dict["pipe_length"] == 100000.0
+    assert merge_dict["pipe_diameter"] == 0.5
 
     assert set(merge_dict["initial_merge_conc"].keys()) == set(expected_initial_merge_conc.keys())
     for species, expected_value in expected_initial_merge_conc.items():

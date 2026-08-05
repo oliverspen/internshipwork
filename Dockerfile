@@ -8,7 +8,7 @@ RUN apt-get update \
 
 COPY . /app
 WORKDIR /app
-RUN mkdir /app/results
+RUN mkdir -p /app/results
 
 RUN chown -R 1000:1000 /app/results
 

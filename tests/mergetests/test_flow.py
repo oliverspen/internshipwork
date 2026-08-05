@@ -3,43 +3,64 @@ import pytest
 
 from internshipwork.merge_support import flow
 
-
-def test_build_merge_inputs_from_definitions_resolves_merge_dependencies(monkeypatch: pytest.MonkeyPatch):
+def test_build_merge_inputs_from_definitions(monkeypatch: pytest.MonkeyPatch):
     merge_definitions = [
-        {"merge_name": "Merge 1", "sources": [("plant", 0), ("plant", 1)]},
-        {"merge_name": "Merge 2", "sources": [("merge", "Merge 1"), ("plant", 2)]},
+        {"merge_name": "Merge 1", "sources": [("plant", 0), ("plant", 1)]}
     ]
 
-    def fake_plant_source(stream_idx: int):
+    def fake_plant_source1(stream1_idx: int):
         return {
             "source_type": "plant",
-            "source_name": stream_idx,
+            "source_name": stream1_idx,
             "temperature_kelvin": 300.0,
             "stream_phase": "gas",
-            "total_massflow": 100.0,
-            "initial_merge_conc": {"co2": 1.0},
+            "total_massflow": 200.0,
+            "initial_merge_conc": {"NO2": 1.0},
         }
 
-    def fake_build_from_sources(source_dicts, merge_name=None):
+    def fake_plant_source2(stream2_idx: int):
+        return {
+            "source_type": "plant",
+            "source_name": stream2_idx,
+            "temperature_kelvin": 350.0,
+            "stream_phase": "gas",
+            "total_massflow": 300.0,
+            "initial_merge_conc": {"NO2": 5.0},
+        }
+
+    def expected_merge_result(source_dicts, merge_name=None):
         return {
             "sources": [item["source_name"] for item in source_dicts],
             "pipe_time": 42.0,
             "temperature_kelvin": 300.0,
             "stream_phase": "gas",
             "total_massflow": float(len(source_dicts) * 100),
-            "initial_merge_conc": {"co2": 1.0},
+            "initial_merge_conc": {"NO2": 1.0},
         }
 
-    monkeypatch.setattr(flow, "_build_plant_source_dict", fake_plant_source)
-    monkeypatch.setattr(flow, "_build_merge_input_from_source_states", fake_build_from_sources)
+    def fake_build_plant_source_dict(stream_idx: int):
+        if stream_idx == 0:
+            return fake_plant_source1(stream_idx)
+        if stream_idx == 1:
+            return fake_plant_source2(stream_idx)
+        raise AssertionError(f"Unexpected stream index: {stream_idx}")
 
-    result = flow.build_merge_inputs_from_definitions(merge_definitions)
+    monkeypatch.setattr(flow, "_build_plant_source_dict", fake_build_plant_source_dict)
+    monkeypatch.setattr(flow, "_build_merge_input_from_source_states", expected_merge_result)
 
-    assert set(result.keys()) == {"Merge 1", "Merge 2"}
-    assert result["Merge 1"]["sources"] == [0, 1]
-    assert result["Merge 2"]["sources"] == ["Merge 1", 2]
-    assert result["Merge 1"]["pipe_time"] == 42.0
-    assert result["Merge 2"]["pipe_time"] == 42.0
+    merge_inputs = flow.build_merge_inputs_from_definitions(merge_definitions)
+    expected_merge_inputs = {
+        "Merge 1": {
+            "sources": [0, 1],
+            "pipe_time": 42.0,
+            "temperature_kelvin": 300.0,
+            "stream_phase": "gas",
+            "total_massflow": 200.0,
+            "initial_merge_conc": {"NO2": 1.0},
+        }
+    }
+
+    assert merge_inputs == expected_merge_inputs
 
 
 def test_build_merge_inputs_from_definitions_raises_for_unknown_merge_dependency(

@@ -36,10 +36,11 @@ def _evaluate_phpitz_plant(
         Dict with keys 'phpitz_input' (input concentrations sent to API) and
         'final' (equilibrium concentrations returned by PH_PITZ).
     """
-    # Extract inlet concentrations from plant values (PH_PITZ supports 6 species including NO)
+    # Extract inlet concentrations from plant values.
     input_concentrations = {
         "H2O": plant_values.get("inlet_H2O", 0),
         "O2": plant_values.get("inlet_O2", 0),
+        "N2": plant_values.get("inlet_N2", 0),
         "SO2": plant_values.get("inlet_SO2", 0),
         "NO2": plant_values.get("inlet_NO2", 0),
         "NO": plant_values.get("inlet_NO", 0),
@@ -84,11 +85,11 @@ def _evaluate_phpitz_merge(
         Dict with keys 'phpitz_input' (input concentrations sent to API) and
         'final' (equilibrium concentrations returned by PH_PITZ).
     """
-    # Convert from internal representation to capitalized species names matching AcidWatch
-    # Note: PH_PITZ supports 6 species (includes NO)
+    # Convert from internal representation to capitalized species names matching AcidWatch.
     input_concentrations = {
         "H2O": merge_values["ppm_molar"].get("H2O", 0),
         "O2": merge_values["ppm_molar"].get("O2", 0),
+        "N2": merge_values["ppm_molar"].get("N2", 0),
         "SO2": merge_values["ppm_molar"].get("SO2", 0),
         "NO2": merge_values["ppm_molar"].get("NO2", 0),
         "NO": merge_values["ppm_molar"].get("NO", 0),

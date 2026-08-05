@@ -144,6 +144,7 @@ def test_plot_single_node_phase_envelope_output(tmp_path, monkeypatch):
     assert output_path.exists()
     assert output_path.suffix == ".png"
 
+    seen = {}
 
     def fake_build_fluid(temp_k, p_bara, mole_fractions):
         seen["temp_k"] = temp_k
@@ -157,6 +158,7 @@ def test_plot_single_node_phase_envelope_output(tmp_path, monkeypatch):
 
     source_state = {
         "initial_merge_conc": {"CO2": 1.0},
+        "temperature_kelvin": 298.15,
     }
 
     output_path = service._plot_single_node_phase_envelope(

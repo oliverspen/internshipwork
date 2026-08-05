@@ -18,15 +18,13 @@ def build_source_rows_from_config(
     merge_definitions = config.get("merge_definitions") or []
     plant_inputs = config["plant_inputs"]
 
+    plant_indices: set[int] = set(range(len(plant_inputs)))
     if merge_definitions:
-        plant_indices: set[int] = set()
         for merge_def in merge_definitions:
             sources = merge_def["sources"]
             for source_type, source_value in sources:
                 if source_type == "plant":
-                    plant_indices.add(source_value)
-    else:
-        plant_indices = set(range(len(plant_inputs)))
+                    plant_indices.add(int(source_value))
 
     source_rows: list[tuple[str, str | int, dict[str, Any]]] = []
     for plant_idx in sorted(plant_indices):

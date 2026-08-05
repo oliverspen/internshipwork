@@ -2144,7 +2144,7 @@ function _getConfigInletSpeciesForModel() {
   };
 }
 
-function addConfigExtraContaminant(selectedSpecies = '') {
+function addConfigExtraContaminant(selectedSpecies = '', options = {}) {
   if (!_cfg) return;
   const modelId = _selectedModelId();
   if (!_isPhpitzModelId(modelId)) return;
@@ -2174,7 +2174,16 @@ function addConfigExtraContaminant(selectedSpecies = '') {
     if (!plant.inlet_conc || typeof plant.inlet_conc !== 'object') plant.inlet_conc = {};
     if (plant.inlet_conc[species] == null) plant.inlet_conc[species] = 0;
   });
-  renderConfigEditor();
+  const openPlantIndexes = _getOpenPlantBodyIndexes();
+  if (Number.isFinite(Number(options.openPlantIndex))) {
+    openPlantIndexes.add(Number(options.openPlantIndex));
+  }
+  renderConfigEditor({
+    openPlantIndexes,
+    openContaminantPickerIndexes: options.keepPickerOpen
+      ? [Number(options.openPlantIndex)]
+      : [],
+  });
 }
 
 function toggleConfigContaminantPicker(index) {
@@ -2187,7 +2196,10 @@ function addConfigExtraContaminantFromPicker(index) {
   const select = document.getElementById(`cfg-add-contaminant-select-${index}`);
   const species = String(select?.value || '').trim();
   if (!species) return;
-  addConfigExtraContaminant(species);
+  addConfigExtraContaminant(species, {
+    openPlantIndex: Number(index),
+    keepPickerOpen: true,
+  });
 }
 
 function removeConfigExtraContaminant(species) {
@@ -2262,7 +2274,27 @@ async function openConfigEditorForMapNode(nodeId) {
   _focusConfigEditorForNode(nodeId);
 }
 
-function renderConfigEditor() {
+function _getOpenPlantBodyIndexes() {
+  const openBodies = document.querySelectorAll('.plant-card-body.open[id^="plant-body-"]');
+  const indexes = new Set();
+  openBodies.forEach(body => {
+    const idxText = String(body.id || '').replace('plant-body-', '');
+    const idx = Number(idxText);
+    if (Number.isFinite(idx) && idx >= 0) indexes.add(idx);
+  });
+  return indexes;
+}
+
+function renderConfigEditor(options = {}) {
+  const openPlantIndexes = options.openPlantIndexes instanceof Set
+    ? options.openPlantIndexes
+    : _getOpenPlantBodyIndexes();
+  const openContaminantPickerIndexes = new Set(
+    Array.isArray(options.openContaminantPickerIndexes)
+      ? options.openContaminantPickerIndexes.map(v => Number(v)).filter(v => Number.isFinite(v) && v >= 0)
+      : []
+  );
+
   document.getElementById('cfg-p-bara').value = _cfg.p_bara ?? '';
   document.getElementById('cfg-storage-name').value = _cfg.storage_name ?? 'Storage';
 
@@ -2322,6 +2354,15 @@ function renderConfigEditor() {
 
   const controlsEl = document.getElementById('cfg-contaminant-controls');
   if (controlsEl) controlsEl.innerHTML = extraControlsHtml;
+
+  openPlantIndexes.forEach(idx => {
+    const body = document.getElementById(`plant-body-${idx}`);
+    if (body) body.classList.add('open');
+  });
+  openContaminantPickerIndexes.forEach(idx => {
+    const row = document.getElementById(`cfg-add-contaminant-row-${idx}`);
+    if (row) row.style.display = 'flex';
+  });
 
   // Merge options
   renderMergeOptions();
@@ -2633,7 +2674,67 @@ function goMBNext() {
     return;
   }
   if (MB.step === 2) {
+    _autoCommitPendingMBStep2Selections();
     renderMBStep3();
+  }
+}
+
+function _mapMBSourceSelectionsToBackendSources(srcs) {
+  return srcs.map(src => {
+    if (src.type === 'plant') {
+      const plantIdx = MB._plants.findIndex(p => p.name === src.id);
+      if (plantIdx !== -1 && MB.plants.includes(plantIdx)) return ['plant', plantIdx];
+    }
+    return ['merge', src.id];
+  });
+}
+
+function _autoSavePendingMBMergeEdit() {
+  if (!Number.isFinite(MB.editMergeIndex) || MB.editMergeIndex < 0) return false;
+  const merge = MB.merges[MB.editMergeIndex];
+  if (!merge) return false;
+
+  const srcs = Array.from(
+    document.querySelectorAll(`input[name="mb-edit-src-${MB.editMergeIndex}"]:checked`)
+  ).map(e => ({
+    id: e.value,
+    type: e.dataset.type,
+  }));
+
+  if (srcs.length < 2) return false;
+  merge.sources = _mapMBSourceSelectionsToBackendSources(srcs);
+  MB.editMergeIndex = -1;
+  return true;
+}
+
+function _autoAddPendingMBMerge() {
+  const mergeNameEl = document.getElementById('mb-mname');
+  if (!mergeNameEl) return false;
+
+  const name = String(mergeNameEl.value || '').trim();
+  if (!name) return false;
+  if (MB.merges.some(m => m.merge_name === name)) return false;
+
+  const srcs = Array.from(document.querySelectorAll('input[name="mb-src"]:checked')).map(e => ({
+    id: e.value,
+    type: e.dataset.type,
+  }));
+  if (srcs.length < 2) return false;
+
+  const len = +document.getElementById('mb-mlen').value;
+  const diam = +document.getElementById('mb-mdiam').value;
+  const sources = _mapMBSourceSelectionsToBackendSources(srcs);
+
+  MB.merges.push({ merge_name: name, sources, pipelength: len, pipediameter: diam });
+  MB.editMergeIndex = -1;
+  return true;
+}
+
+function _autoCommitPendingMBStep2Selections() {
+  const didSaveEdit = _autoSavePendingMBMergeEdit();
+  const didAddMerge = _autoAddPendingMBMerge();
+  if (didSaveEdit || didAddMerge) {
+    renderMBDraftReview();
   }
 }
 
@@ -2762,13 +2863,7 @@ function addMBMerge() {
   if (MB.merges.some(m => m.merge_name === name)) { alert('That merge has already been added.'); return; }
 
   // Build sources as [["plant"|"merge", index/name]] matching backend format.
-  const sources = srcs.map(src => {
-    if (src.type === 'plant') {
-      const plantIdx = MB._plants.findIndex(p => p.name === src.id);
-      if (plantIdx !== -1 && MB.plants.includes(plantIdx)) return ['plant', plantIdx];
-    }
-    return ['merge', src.id];
-  });
+  const sources = _mapMBSourceSelectionsToBackendSources(srcs);
 
   MB.merges.push({ merge_name: name, sources, pipelength: len, pipediameter: diam });
   MB.editMergeIndex = -1;
@@ -2803,13 +2898,7 @@ function saveMBMergeEdit(i) {
 
   if (srcs.length < 2) { alert('Select at least 2 source nodes.'); return; }
 
-  const sources = srcs.map(src => {
-    if (src.type === 'plant') {
-      const plantIdx = MB._plants.findIndex(p => p.name === src.id);
-      if (plantIdx !== -1 && MB.plants.includes(plantIdx)) return ['plant', plantIdx];
-    }
-    return ['merge', src.id];
-  });
+  const sources = _mapMBSourceSelectionsToBackendSources(srcs);
 
   merge.sources = sources;
   MB.editMergeIndex = -1;

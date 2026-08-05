@@ -330,6 +330,7 @@ def run_dynamic_merges(
                             "pipe_diameter_m": plant_input.get("pipediameter"),
                             "inlet_O2": float(inlet_conc.get("O2", 0.0)),
                             "inlet_H2O": float(inlet_conc.get("H2O", 0.0)),
+                            "inlet_N2": float(inlet_conc.get("N2", 0.0)),
                             "inlet_SO2": float(inlet_conc.get("SO2", 0.0)),
                             "inlet_NO2": float(inlet_conc.get("NO2", 0.0)),
                             "inlet_NO": float(inlet_conc.get("NO", 0.0)),

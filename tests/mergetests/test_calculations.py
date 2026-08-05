@@ -104,6 +104,7 @@ def test_build_plant_source_dict(monkeypatch: pytest.MonkeyPatch):
     expected_initial_merge_conc = {
         "H2O": 0.0,
         "O2": 0.0,
+        "N2": 0.0,
         "SO2": 0.0016037206318659288,
         "NO2": 0.0004009301579664822,
         "H2S": 0.0,
@@ -166,6 +167,7 @@ def test_build_merge_input_from_source_states(monkeypatch: pytest.MonkeyPatch):
     expected_initial_merge_conc = {
         "H2O": 0.0,
         "O2": 0.0,
+        "N2": 0.0,
         "SO2": 0.0016037206318659288,
         "NO2": 0.0004009301579664822,
         "H2S": 0.0,
@@ -179,6 +181,7 @@ def test_build_merge_input_from_source_states(monkeypatch: pytest.MonkeyPatch):
     expected_ppm_molar = {
         "H2O": 0.0,
         "O2": 0.0,
+        "N2": 0.0,
         "SO2": 20.0,
         "NO2": 5.0,
         "H2S": 0.0,
@@ -192,6 +195,7 @@ def test_build_merge_input_from_source_states(monkeypatch: pytest.MonkeyPatch):
     expected_ppm_mass = {
         "H2O": 0.0,
         "O2": 0.0,
+        "N2": 0.0,
         "SO2": 1280.0,
         "NO2": 230.0,
         "H2S": 0.0,
@@ -293,6 +297,7 @@ def test_build_merge_input_two_sources_weighted_mix(monkeypatch: pytest.MonkeyPa
     expected_initial_merge_conc = {
         "H2O": 0.0,
         "O2": 0.0,
+        "N2": 0.0,
         "SO2": 0.0020691470879106192,
         "NO2": 0.0006006201053109881,
         "H2S": 0.0,

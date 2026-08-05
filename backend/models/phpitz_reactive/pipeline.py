@@ -31,7 +31,7 @@ def to_phpitz_reactive_input_from_source_state(
     Species are now consistently capitalized (O2, H2O, etc.) throughout the system.
     """
     # Species supported by PH_PITZ model (now in capitalized form matching AcidWatch output).
-    supported_species = ("H2O", "O2", "SO2", "NO2", "H2S", "NO")
+    supported_species = ("H2O", "O2", "N2", "SO2", "NO2", "H2S", "NO")
 
     if "ppm_molar" in source_state:
         # Source state already carries pre-computed molar ppm values — use them directly.

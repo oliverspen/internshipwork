@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 
-PLANT_SPECIES = ("O2", "H2O", "SO2", "NO2", "NO", "SO3", "H2S")
+PLANT_SPECIES = ("O2", "H2O", "N2", "SO2", "NO2", "NO", "SO3", "H2S")
 VALID_STREAM_PHASES = {"gas", "liquid"}
 
 INPUT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "input_config.json"

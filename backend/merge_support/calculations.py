@@ -190,6 +190,10 @@ def _build_merge_input_from_source_states(
     )
     merge_density = _co2_density_kg_per_m3(merge_stream_phase, pressure_pa, temperature_kelvin_total)
 
+    all_species: set[str] = set(SPECIES_ORDER)
+    for source_dict in source_dicts:
+        all_species.update(str(species) for species in source_dict["initial_merge_conc"].keys())
+
     initial_merge_conc = {
         species: (
             sum(
@@ -199,7 +203,7 @@ def _build_merge_input_from_source_states(
             )
             / total_massflow
         )
-        for species in SPECIES_ORDER
+        for species in sorted(all_species)
     }
 
     ppm_molar = {
@@ -208,7 +212,7 @@ def _build_merge_input_from_source_states(
     }
     ppm_mass = {
         species: ppm_molar[species] * _get_molecular_weight(species)
-        for species in SPECIES_ORDER
+        for species in sorted(all_species)
     }
 
     merge_pipe_diameter, merge_pipe_length = _get_merge_inputs(input_config, merge_name)

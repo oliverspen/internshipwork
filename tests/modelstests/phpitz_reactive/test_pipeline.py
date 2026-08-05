@@ -30,7 +30,7 @@ def test_to_phpitz_input_uses_existing_ppm_molar():
 
     out = pipeline.to_phpitz_reactive_input_from_source_state(source_state)
 
-    assert out == {"H2O": 1.0, "O2": 0.0, "SO2": 2.2, "NO2": 0.3, "H2S": 0.0, "NO": 0.6}
+    assert out == {"H2O": 1.0, "O2": 0.0, "N2": 0.0, "SO2": 2.2, "NO2": 0.3, "H2S": 0.0, "NO": 0.6}
 
 
 def test_to_phpitz_input_converts_from_initial_conc(monkeypatch):
@@ -44,7 +44,7 @@ def test_to_phpitz_input_converts_from_initial_conc(monkeypatch):
 
     source_state = {
         "temperature_kelvin": 300.0,
-        "initial_merge_conc": {"SO2": 1.0, "NO2": 2.0, "NO": 0.7},
+        "initial_merge_conc": {"SO2": 1.0, "NO2": 2.0, "NO": 0.7, "N2": 4.0},
     }
 
     out = pipeline.to_phpitz_reactive_input_from_source_state(source_state)
@@ -52,6 +52,7 @@ def test_to_phpitz_input_converts_from_initial_conc(monkeypatch):
     assert out["SO2"] == pytest.approx(2.2)
     assert out["NO2"] == pytest.approx(3.2)
     assert out["NO"] == pytest.approx(1.9)
+    assert out["N2"] == pytest.approx(5.2)
 
 
 def test_source_results_for_phpitz_no_merges_includes_all_plants(monkeypatch):

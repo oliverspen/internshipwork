@@ -20,6 +20,24 @@ system_cls = jneqsim.thermo.system.SystemSrkEos
 operations_cls = jneqsim.thermodynamicoperations.ThermodynamicOperations
 
 
+def _finite_curve_pairs(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    pair_mask = np.isfinite(x) & np.isfinite(y)
+    x_pair = x[pair_mask]
+    y_pair = y[pair_mask]
+    if x_pair.size > 1 and y_pair.size > 1:
+        return x_pair, y_pair
+
+    # Some NeqSim outputs contain finite X and Y values at different indices.
+    # If pairwise filtering collapses to <=1 point, salvage by pairing finite
+    # sequences positionally up to their common length.
+    x_finite = x[np.isfinite(x)]
+    y_finite = y[np.isfinite(y)]
+    n = min(x_finite.size, y_finite.size)
+    if n <= 0:
+        return np.array([], dtype=float), np.array([], dtype=float)
+    return x_finite[:n], y_finite[:n]
+
+
 def _to_mole_fractions(source_state: dict[str, Any]) -> dict[str, float]:
     raw_conc = source_state["initial_merge_conc"]
 
@@ -115,24 +133,30 @@ def _plot_single_node_phase_envelope(
     dew_p = np.array(list(ops.get("dewP")), dtype=float)
     bub_t = np.array(list(ops.get("bubT")), dtype=float) - 273.15
     bub_p = np.array(list(ops.get("bubP")), dtype=float)
+    dew_t_plot, dew_p_plot = _finite_curve_pairs(dew_t, dew_p)
+    bub_t_plot, bub_p_plot = _finite_curve_pairs(bub_t, bub_p)
 
     fig, ax = plt.subplots(figsize=(10.8, 7.2), dpi=130)
     fig.patch.set_facecolor("#f7f9fc")
     ax.set_facecolor("#ffffff")
 
     dew_line, = ax.plot(
-        dew_t,
-        dew_p,
+        dew_t_plot,
+        dew_p_plot,
         color="#136fdb",
         label="Dew Point",
         linewidth=2.6,
         alpha=0.98,
         zorder=3,
         solid_capstyle="round",
+        marker="o",
+        markeredgewidth=0,
+        markersize=2.6,
+        markevery=2,
     )
     bubble_line, = ax.plot(
-        bub_t,
-        bub_p,
+        bub_t_plot,
+        bub_p_plot,
         color="#f97316",
         label="Bubble Point",
         linewidth=2.6,
@@ -160,17 +184,14 @@ def _plot_single_node_phase_envelope(
     ax.set_ylabel("Pressure (bara)", fontsize=12, color="#1f2937")
     ax.set_title(f"Phase Envelope - {source_type.capitalize()} {source_name}", fontsize=15, weight="bold", color="#111827")
     ax.tick_params(axis="both", colors="#374151", labelsize=10)
-    dew_mask = np.isfinite(dew_t) & np.isfinite(dew_p)
-    bub_mask = np.isfinite(bub_t) & np.isfinite(bub_p)
-
     visible_t = np.concatenate([
-        dew_t[dew_mask],
-        bub_t[bub_mask],
+        dew_t_plot,
+        bub_t_plot,
         np.array([operating_temp_c], dtype=float),
     ])
     visible_p = np.concatenate([
-        dew_p[dew_mask],
-        bub_p[bub_mask],
+        dew_p_plot,
+        bub_p_plot,
         np.array([pressure_bara], dtype=float),
     ])
 

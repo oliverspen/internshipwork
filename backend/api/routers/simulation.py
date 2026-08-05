@@ -1,10 +1,13 @@
 """Simulation endpoints — starts jobs in background threads and exposes a polling endpoint."""
 
 import json
+import zipfile
 import threading
 import uuid
+from html import escape
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
 
@@ -16,6 +19,7 @@ from backend.user_inputs import (
     set_runtime_input_config,
 )
 from backend.pipemapping.dev_pipeline_map import _all_dev_pipeline_maps
+from backend.models.phase_envelope.runtime import generate_phase_envelopes_from_config
 
 router = APIRouter()
 
@@ -29,6 +33,93 @@ _MODEL_FOLDERS = {
 
 # Simple in-memory job store; fine for a single-process dev server.
 _jobs: dict[str, dict[str, Any]] = {}
+_PHASE_ENVELOPES_DIRNAME = "phase envelopes"
+
+
+def _write_phase_envelope_index(phase_dir: Path, image_names: list[str]) -> Path | None:
+    """Write an index page listing all phase envelope images in a session folder."""
+    if not image_names:
+        return None
+
+    phase_dir.mkdir(parents=True, exist_ok=True)
+    image_blocks = "\n".join(
+        (
+            f"<section><h2>{escape(name)}</h2>"
+            f"<p><a href=\"{quote(name)}\" target=\"_blank\">Open image</a></p>"
+            "<div class=\"phase-zoom-controls\">"
+            "<button type=\"button\" class=\"zoom-btn\" data-zoom=\"out\">-</button>"
+            "<button type=\"button\" class=\"zoom-btn\" data-zoom=\"in\">+</button>"
+            "<button type=\"button\" class=\"zoom-btn\" data-zoom=\"reset\">Reset</button>"
+            "</div>"
+            "<div class=\"phase-zoom-frame\">"
+            f"<img src=\"{quote(name)}\" alt=\"{escape(name)}\" class=\"phase-zoom-img\" data-scale=\"1\">"
+            "</div>"
+            "</section>"
+        )
+        for name in image_names
+    )
+
+    html_content = (
+        "<!doctype html><html><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Phase Envelopes</title>"
+        "<style>"
+        "body{font-family:Arial,sans-serif;margin:20px;line-height:1.4;background:#f8fafc;color:#111827}"
+        "section{margin:0 0 18px 0;padding:12px;border:1px solid #d1d5db;border-radius:8px;background:#fff}"
+        ".phase-zoom-controls{display:flex;gap:8px;align-items:center;margin:8px 0}"
+        ".zoom-btn{padding:5px 10px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:6px;cursor:pointer}"
+        ".zoom-btn:hover{background:#eef2ff}"
+        ".phase-zoom-frame{overflow:auto;max-height:72vh;border:1px solid #e5e7eb;border-radius:6px;background:#fff}"
+        ".phase-zoom-img{display:block;max-width:none;width:100%;height:auto;transition:width .1s ease}"
+        "</style></head>"
+        "<body>"
+        "<h1>Phase Envelopes</h1>"
+        f"<p>Total files: {len(image_names)}. Tip: use mouse wheel over graph to zoom in/out.</p>{image_blocks}"
+        "<script>"
+        "(function(){"
+        "function clamp(v,min,max){return Math.min(max,Math.max(min,v));}"
+        "function applyScale(img,scale){img.dataset.scale=String(scale);img.style.width=(scale*100).toFixed(2)+'%';}"
+        "document.querySelectorAll('section').forEach(function(section){"
+        "  const img=section.querySelector('.phase-zoom-img');"
+        "  const frame=section.querySelector('.phase-zoom-frame');"
+        "  if(!img||!frame)return;"
+        "  section.querySelectorAll('.zoom-btn').forEach(function(btn){"
+        "    btn.addEventListener('click',function(){"
+        "      const kind=btn.getAttribute('data-zoom');"
+        "      const current=Number(img.dataset.scale||'1')||1;"
+        "      if(kind==='reset'){applyScale(img,1);return;}"
+        "      const next=kind==='in'?current*1.2:current/1.2;"
+        "      applyScale(img,clamp(next,0.25,8));"
+        "    });"
+        "  });"
+        "  frame.addEventListener('wheel',function(ev){"
+        "    if(!ev.ctrlKey && !ev.metaKey){ev.preventDefault();}"
+        "    const current=Number(img.dataset.scale||'1')||1;"
+        "    const factor=ev.deltaY<0?1.08:1/1.08;"
+        "    applyScale(img,clamp(current*factor,0.25,8));"
+        "  },{passive:false});"
+        "});"
+        "})();"
+        "</script></body></html>"
+    )
+
+    index_path = phase_dir / "index.html"
+    index_path.write_text(html_content, encoding="utf-8")
+    return index_path
+
+
+def _write_phase_envelope_zip(session_dir: Path, phase_dir: Path, image_names: list[str]) -> Path | None:
+    """Write a ZIP archive with all phase envelope images for a simulation session."""
+    if not image_names:
+        return None
+
+    zip_path = session_dir / "phase_envelopes.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for image_name in image_names:
+            image_path = phase_dir / image_name
+            if image_path.exists():
+                zf.write(image_path, arcname=image_name)
+    return zip_path
 
 
 def _find_latest_session(model_folder: str) -> str | None:
@@ -162,6 +253,9 @@ def _run_job(
         session_id = _find_latest_session(folder)
         html_url = summary_excel_url = None
         graph_urls: list[str] = []
+        phase_envelope_urls: list[str] = []
+        phase_envelope_folder_url: str | None = None
+        phase_envelope_zip_url: str | None = None
         if session_id:
             session_dir = _RESULTS_ROOT / folder / session_id
             html_files = list(session_dir.glob("*_map.html"))
@@ -178,6 +272,35 @@ def _run_job(
             elif dynamic_excel_path.exists():
                 summary_excel_url = f"/results/{folder}/{session_id}/dynamic_results.xlsx"
 
+            if model in {"tocomo", "phpitz"}:
+                try:
+                    generated_paths = generate_phase_envelopes_from_config(
+                        config,
+                        session_dir / _PHASE_ENVELOPES_DIRNAME,
+                    )
+                    quoted_phase_dir = quote(_PHASE_ENVELOPES_DIRNAME)
+                    phase_envelope_urls = [
+                        f"/results/{folder}/{session_id}/{quoted_phase_dir}/{quote(path.name)}"
+                        for path in generated_paths
+                    ]
+                    index_path = _write_phase_envelope_index(
+                        session_dir / _PHASE_ENVELOPES_DIRNAME,
+                        [path.name for path in generated_paths],
+                    )
+                    zip_path = _write_phase_envelope_zip(
+                        session_dir,
+                        session_dir / _PHASE_ENVELOPES_DIRNAME,
+                        [path.name for path in generated_paths],
+                    )
+                    if index_path is not None:
+                        phase_envelope_folder_url = (
+                            f"/results/{folder}/{session_id}/{quoted_phase_dir}/{quote(index_path.name)}"
+                        )
+                    if zip_path is not None:
+                        phase_envelope_zip_url = f"/results/{folder}/{session_id}/{quote(zip_path.name)}"
+                except Exception as phase_exc:
+                    print(f"Phase envelope generation skipped for job {job_id}: {phase_exc}")
+
         _jobs[job_id].update({
             "status": "done",
             "progress_pct": 100,
@@ -187,6 +310,9 @@ def _run_job(
             "results": _to_json_safe(results),
             "html_url": html_url,
             "graph_urls": graph_urls,
+            "phase_envelope_urls": phase_envelope_urls,
+            "phase_envelope_folder_url": phase_envelope_folder_url,
+            "phase_envelope_zip_url": phase_envelope_zip_url,
             "summary_excel_url": summary_excel_url,
         })
     except Exception as exc:
@@ -212,7 +338,7 @@ def start_simulation(model: str, body: SimulationRequest) -> dict[str, str]:
     _jobs[job_id] = {
         "status": "running", "model": model,
         "session_id": None, "results": None,
-        "html_url": None, "graph_urls": [], "summary_excel_url": None, "error": None,
+        "html_url": None, "graph_urls": [], "phase_envelope_urls": [], "phase_envelope_folder_url": None, "phase_envelope_zip_url": None, "summary_excel_url": None, "error": None,
         "progress_pct": 0, "progress_current": 0, "progress_total": 1, "progress_label": "Queued",
     }
     threading.Thread(

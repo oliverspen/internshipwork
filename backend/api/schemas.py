@@ -57,6 +57,9 @@ class SessionInfo(BaseModel):
     pipeline_map_name: str | None = None
     html_url: str | None
     graph_urls: list[str] = Field(default_factory=list)
+    phase_envelope_urls: list[str] = Field(default_factory=list)
+    phase_envelope_folder_url: str | None = None
+    phase_envelope_zip_url: str | None = None
     summary_excel_url: str | None = None
 
 
@@ -66,6 +69,9 @@ class SimulationResponse(BaseModel):
     results: list[dict[str, Any]]
     html_url: str | None = None
     graph_urls: list[str] = Field(default_factory=list)
+    phase_envelope_urls: list[str] = Field(default_factory=list)
+    phase_envelope_folder_url: str | None = None
+    phase_envelope_zip_url: str | None = None
     summary_excel_url: str | None = None
 
 

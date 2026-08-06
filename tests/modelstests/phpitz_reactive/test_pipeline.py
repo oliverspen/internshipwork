@@ -3,7 +3,7 @@ import importlib
 import pytest
 
 
-pipeline = importlib.import_module("internshipwork.models.phpitz_reactive.pipeline")
+pipeline = importlib.import_module("backend.models.phpitz_reactive.pipeline")
 
 
 def test_to_phpitz_input_uses_existing_ppm_molar():

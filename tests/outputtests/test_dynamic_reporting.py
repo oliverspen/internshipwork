@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 
-dynamic_reporting = importlib.import_module("internshipwork.output.dynamic_reporting")
+dynamic_reporting = importlib.import_module("backend.output.dynamic_reporting")
 
 
 def _sample_dynamic_results() -> list[dict]:

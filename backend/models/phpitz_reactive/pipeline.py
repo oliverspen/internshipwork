@@ -10,10 +10,6 @@ from backend.user_inputs import get_input_config
 def to_phpitz_reactive_input_from_source_state(
     source_state: dict[str, Any],
 ) -> dict[str, float]:
-    """Convert source state (plant/merge) into PH_PITZ reactive molar-ppm input.
-    
-    Species are now consistently capitalized (O2, H2O, etc.) throughout the system.
-    """
     supported_species = (
         "H2O", "O2", "N2", "SO2", "NO2", "H2S", "NO",
         "H2SO4", "HNO3", "S8", "NH3", "N2O", "N2O4", "NH4HSO4",
@@ -40,7 +36,7 @@ def source_results_for_phpitz_reactive() -> list[tuple[str, str | int, dict[str,
                     plant_indices.add(int(source_value))
     else:
         # No merges: plants feed directly into storage — include all configured plants.
-        plant_inputs = input_config.get("plant_inputs") or []
+        plant_inputs = input_config.get("plant_inputs")
         plant_indices = set(range(len(plant_inputs)))
 
     # Add each plant source state in ascending index order.

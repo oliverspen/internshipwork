@@ -3,7 +3,7 @@ import importlib
 from pathlib import Path
 
 
-phpitz_dynamic_model = importlib.import_module("internshipwork.models.dynamic.phpitz_dynamic_model")
+phpitz_dynamic_model = importlib.import_module("backend.models.dynamic.phpitz_dynamic_model")
 
 
 class _FixedDatetime:

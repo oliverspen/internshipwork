@@ -2,7 +2,7 @@ import importlib
 import math
 
 
-delay = importlib.import_module("internshipwork.models.dynamic.delay")
+delay = importlib.import_module("backend.models.dynamic.delay")
 
 
 def test_contaminant_pipe_time_matches_manual_formula():

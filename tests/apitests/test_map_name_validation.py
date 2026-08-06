@@ -2,7 +2,7 @@ import importlib
 
 
 def test_pipeline_map_create_request_allows_spaces_in_name():
-    schemas = importlib.import_module("internshipwork.api.schemas")
+    schemas = importlib.import_module("backend.api.schemas")
 
     req = schemas.PipelineMapCreateRequest(
         name="North Sea Export",

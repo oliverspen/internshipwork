@@ -4,14 +4,14 @@ import pytest
 
 
 MODULES = [
-    "internshipwork.models.dynamic.delay",
-    "internshipwork.models.dynamic.phpitz_dynamic_model",
-    "internshipwork.models.dynamic.runner",
-    "internshipwork.models.dynamic.tocomo_dynamic_model",
-    "internshipwork.models.phpitz_reactive.pipeline",
-    "internshipwork.models.phpitz_reactive.runner",
-    "internshipwork.models.tocomo.pipeline",
-    "internshipwork.models.tocomo.runner",
+    "backend.models.dynamic.delay",
+    "backend.models.dynamic.phpitz_dynamic_model",
+    "backend.models.dynamic.runner",
+    "backend.models.dynamic.tocomo_dynamic_model",
+    "backend.models.phpitz_reactive.pipeline",
+    "backend.models.phpitz_reactive.runner",
+    "backend.models.tocomo.pipeline",
+    "backend.models.tocomo.runner",
 ]
 
 

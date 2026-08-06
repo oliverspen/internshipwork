@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 
-user_inputs = importlib.import_module("internshipwork.user_inputs")
+user_inputs = importlib.import_module("backend.user_inputs")
 
 
 def _valid_plant(name: str = "Plant A") -> dict[str, object]:

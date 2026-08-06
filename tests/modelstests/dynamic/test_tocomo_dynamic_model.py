@@ -3,7 +3,7 @@ import importlib
 from pathlib import Path
 
 
-tocomo_dynamic_model = importlib.import_module("internshipwork.models.dynamic.tocomo_dynamic_model")
+tocomo_dynamic_model = importlib.import_module("backend.models.dynamic.tocomo_dynamic_model")
 
 
 class _FixedDatetime:

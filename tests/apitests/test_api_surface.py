@@ -5,7 +5,7 @@ import pytest
 
 def test_fastapi_app_includes_expected_routes():
     pytest.importorskip("fastapi")
-    app_module = importlib.import_module("internshipwork.api.app")
+    app_module = importlib.import_module("backend.api.app")
     app = app_module.app
 
     path_map = app.openapi().get("paths", {})
@@ -19,7 +19,7 @@ def test_fastapi_app_includes_expected_routes():
 
 
 def test_session_info_schema_supports_graph_urls():
-    schemas = importlib.import_module("internshipwork.api.schemas")
+    schemas = importlib.import_module("backend.api.schemas")
 
     session = schemas.SessionInfo(
         session_id="20260731_120000_demo",

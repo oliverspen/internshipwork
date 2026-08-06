@@ -571,7 +571,11 @@ def _build_storage_receipt_table_for_column(
     value_col: str,
     dt_days: float = 0.1,
 ) -> pd.DataFrame:
-    """Build storage receipt rows for a selected merge output column, snapped to next dt step."""
+    """Build storage receipt rows for a selected merge output column, snapped to next dt step.
+
+    For concentration-like metrics, include a t=0 baseline point per storage stream
+    using the first known terminal value so storage charts start immediately.
+    """
     merge_table = _ensure_merge_metric_column(pd.DataFrame(dynamic_results), value_col)
     if merge_table.empty or value_col not in merge_table.columns:
         return pd.DataFrame()
@@ -589,6 +593,7 @@ def _build_storage_receipt_table_for_column(
         return pd.DataFrame()
 
     terminal_rows = merge_table[merge_table["merge_name"].astype(str).isin(terminal_merges)].copy()
+    terminal_rows["storage_stream"] = terminal_rows["merge_name"].astype(str) + " -> Storage"
     terminal_rows["pipe_time_days"] = pd.to_numeric(
         terminal_rows.get("pipe_time_days"),
         errors="coerce",
@@ -607,10 +612,26 @@ def _build_storage_receipt_table_for_column(
     terminal_rows["time_days"] = raw_arrival_time.apply(
         lambda t: math.ceil(t / dt_days) * dt_days if dt_days > 0 else t
     )
-    terminal_rows["storage_stream"] = terminal_rows["merge_name"].astype(str) + " -> Storage"
     terminal_rows["metric_value"] = pd.to_numeric(terminal_rows[value_col], errors="coerce")
 
-    return terminal_rows[["time_days", "storage_stream", "metric_value"]]
+    storage_rows = terminal_rows[["time_days", "storage_stream", "metric_value"]]
+
+    # Keep flow behavior unchanged (arrival-only). For composition metrics, add a
+    # day-0 baseline using the first known terminal value to avoid late chart starts.
+    if value_col != "flow_kg_per_h":
+        first_rows = (
+            terminal_rows.sort_values("time_days")
+            .groupby("storage_stream", as_index=False)
+            .first()[["storage_stream", "metric_value"]]
+        )
+        first_rows["time_days"] = 0.0
+        storage_rows = pd.concat([first_rows, storage_rows], ignore_index=True)
+        storage_rows = storage_rows.drop_duplicates(
+            subset=["time_days", "storage_stream", "metric_value"]
+        )
+        storage_rows = storage_rows.sort_values(["storage_stream", "time_days"]).reset_index(drop=True)
+
+    return storage_rows
 
 
 def _plot_metric_dashboard(
@@ -943,6 +964,22 @@ def _metric_has_changes(
     return len(set(plant_values)) > 1
 
 
+def _has_predicted_species(dynamic_results: list[dict[str, Any]], species: str) -> bool:
+    """Return True when any merge final payload contains the species."""
+    target = str(species).strip().upper()
+    for result in dynamic_results:
+        final_payload = result.get("final", {})
+        if isinstance(final_payload, dict) and target in {str(k).strip().upper() for k in final_payload.keys()}:
+            return True
+    return False
+
+
+def _has_inlet_species(plant_results: list[dict[str, Any]], species: str) -> bool:
+    """Return True when any plant row includes the inlet species column."""
+    col = f"inlet_{str(species).strip().upper()}"
+    return any(col in row for row in plant_results)
+
+
 def plot_all_dynamic_dashboards(
     dynamic_results: list[dict[str, Any]],
     plant_results: list[dict[str, Any]],
@@ -954,8 +991,6 @@ def plot_all_dynamic_dashboards(
         return
 
     metrics = _infer_all_metrics(dynamic_results, plant_results)
-    # Only plot metrics where values actually change during the simulation
-    metrics = [m for m in metrics if _metric_has_changes(dynamic_results, plant_results, m)]
     if not metrics:
         print("No metrics found in simulation results; skipping graphs.")
         return
@@ -1045,12 +1080,25 @@ def plot_all_dynamic_dashboards(
         fig.suptitle(f"Dynamic Changes — {metric['name']}", fontsize=16, fontweight="bold", y=0.99)
         fig.tight_layout(rect=(0.03, 0.02, 0.85, 0.97))
 
-        # Save as separate file per metric in graphs/ subfolder
-        metric_suffix = metric["name"].lower().replace(" ", "_")
-        metric_path = graph_dir / f"{metric_suffix}graph.png"
-        fig.savefig(metric_path, dpi=300, bbox_inches="tight")
+        # Save one or more files per metric in graphs/ subfolder with species grouping.
+        if metric["name"] == "Flow":
+            file_names = ["flow_graph.png"]
+        else:
+            species = str(metric["name"]).strip().upper()
+            safe_species = species.lower().replace(" ", "_")
+            file_names: list[str] = []
+            if _has_predicted_species(dynamic_results, species):
+                file_names.append(f"predicted_{safe_species}.png")
+            if _has_inlet_species(plant_results, species):
+                file_names.append(f"inlet_{safe_species}.png")
+            if not file_names:
+                file_names.append(f"metric_{safe_species}.png")
+
+        for file_name in file_names:
+            metric_path = graph_dir / file_name
+            fig.savefig(metric_path, dpi=300, bbox_inches="tight")
+            saved_paths.append(metric_path)
         plt.close(fig)
-        saved_paths.append(metric_path)
 
     print(f"Saved {len(saved_paths)} graph(s) to: {graph_dir}")
 

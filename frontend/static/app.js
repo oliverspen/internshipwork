@@ -155,11 +155,26 @@ async function loadMaps() {
   try {
     const maps = await api('/api/maps/');
     const sel = document.getElementById('map-sel');
+    const list = document.getElementById('map-list');
     const previousSelection = sel.value;
 
     sel.innerHTML = maps.length
       ? maps.map(m => `<option value="${m.name}">${m.name}</option>`).join('')
       : '<option value="">No maps saved</option>';
+
+    if (list) {
+      list.innerHTML = maps.length
+        ? maps.map(map => `
+            <div class="map-item">
+              <button class="map-item-select" type="button" onclick="selectMapFromList(${JSON.stringify(map.name)})">
+                <span class="map-item-name">${_esc(map.name)}</span>
+                <span class="map-item-meta">${map.merge_count} merge${map.merge_count === 1 ? '' : 's'}</span>
+              </button>
+              <button class="btn btn-sm map-item-delete" type="button" onclick="deleteMapFromList(${JSON.stringify(map.name)})">Delete</button>
+            </div>
+          `).join('')
+        : '<div class="empty">No maps saved</div>';
+    }
 
     if (maps.length) {
       if (previousSelection && maps.some(m => m.name === previousSelection)) {
@@ -172,6 +187,39 @@ async function loadMaps() {
   } catch {
     showMapPreviewMessage('Could not load saved maps.');
   }
+}
+
+function selectMapFromList(mapName) {
+  const sel = document.getElementById('map-sel');
+  if (!sel) return;
+  sel.value = mapName;
+  onMapSelectionChange();
+}
+
+async function deleteMapFromList(mapName) {
+  const selectedName = String(mapName || '').trim();
+  if (!selectedName) {
+    alert('Select a pipeline map to delete first.');
+    return;
+  }
+
+  const confirmed = window.confirm(`Delete pipeline map '${selectedName}'? This cannot be undone.`);
+  if (!confirmed) return;
+
+  try {
+    await api(`/api/maps/${encodeURIComponent(selectedName)}`, { method: 'DELETE' });
+    closeModal('map-vars-modal');
+    await loadMaps();
+    status(`Deleted pipeline map '${selectedName}'.`, 'ok');
+  } catch (e) {
+    alert('Could not delete map: ' + e.message);
+  }
+}
+
+async function deleteSelectedMap() {
+  const sel = document.getElementById('map-sel');
+  const mapName = String(sel?.value || '').trim();
+  return deleteMapFromList(mapName);
 }
 
 function _plantLabelByIndex(plantInputs, plantIndex) {
@@ -712,7 +760,18 @@ async function _run(model, mapName) {
 
     const isDynamicModel = _isDynamicModel(model);
     if (isDynamicModel) {
-      renderDynamicGraphs(result.graph_urls || [], mapName);
+      let dynamicMapData = null;
+      let dynamicPlantInputs = [];
+      try {
+        const [mapData, cfg] = await _loadMapAndConfigWithRetry(mapName);
+        dynamicMapData = mapData;
+        dynamicPlantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
+        _currentPlantInputs = dynamicPlantInputs;
+      } catch {
+        // Keep graphs visible even if map preview data fails to load.
+      }
+
+      renderDynamicGraphs(result.graph_urls || [], mapName, dynamicMapData, dynamicPlantInputs);
       hideResultsSummary();
     } else {
       showMapLoading(`Loading interactive pipeline map: ${mapName}...`);
@@ -795,7 +854,7 @@ function _graphLabelFromUrl(url, index) {
   return base ? base.replace(/\b\w/g, c => c.toUpperCase()) : fallback;
 }
 
-function renderDynamicGraphs(graphUrls, mapName) {
+function renderDynamicGraphs(graphUrls, mapName, mapData = null, plantInputs = []) {
   const uniqueUrls = Array.isArray(graphUrls)
     ? Array.from(new Set(graphUrls.filter(Boolean).map(String)))
     : [];
@@ -818,6 +877,15 @@ function renderDynamicGraphs(graphUrls, mapName) {
 
   setMapPanelTitle('Dynamic Graphs');
   placeholder.className = '';
+  const mapSectionHtml = mapData
+    ? `
+      <div class="dynamic-map-preview-section">
+        <div class="map-preview-title">Interactive map for <strong>${_esc(mapName)}</strong></div>
+        <div id="dynamic-map-preview-host"></div>
+      </div>
+    `
+    : '';
+
   placeholder.innerHTML = `
     <div class="map-preview-wrap dynamic-graphs-wrap">
       <div class="dynamic-graphs-header">
@@ -832,8 +900,27 @@ function renderDynamicGraphs(graphUrls, mapName) {
         <img id="dynamic-graph-image" class="dynamic-graph-image" src="${_esc(initialUrl)}" alt="Dynamic simulation graph">
       </div>
     </div>
+    ${mapSectionHtml}
   `;
   placeholder.style.display = 'block';
+
+  if (mapData) {
+    const mapHost = document.getElementById('dynamic-map-preview-host');
+    if (mapHost) {
+      renderMapPreview(
+        mapName,
+        mapData,
+        plantInputs,
+        null,
+        'Interactive map',
+        {
+          interactive: true,
+          placeholderEl: mapHost,
+          suppressPanelTitle: true,
+        },
+      );
+    }
+  }
 }
 
 function switchDynamicGraph() {
@@ -1574,12 +1661,16 @@ function renderMapPreview(
   titlePrefix = 'Previewing saved map',
   options = {},
 ) {
-  setMapPanelTitle('Interactive Pipeline Map');
+  const suppressPanelTitle = Boolean(options?.suppressPanelTitle);
+  if (!suppressPanelTitle) setMapPanelTitle('Interactive Pipeline Map');
   const interactive = Boolean(options?.interactive);
-  const placeholder = document.getElementById('map-placeholder');
+  const placeholder = options?.placeholderEl || document.getElementById('map-placeholder');
   const frame = document.getElementById('map-frame');
-  frame.style.display = 'none';
-  frame.src = 'about:blank';
+  if (frame) {
+    frame.style.display = 'none';
+    frame.src = 'about:blank';
+  }
+  if (!placeholder) return;
 
   const defs = Array.isArray(mapData?.merge_definitions) ? mapData.merge_definitions : [];
 
@@ -2605,6 +2696,31 @@ function updateMBPlantsFromStep1() {
   renderMBDraftReview();
 }
 
+function selectAllMBPlants() {
+  const allIndexes = MB._plants.map((_, i) => i);
+  if (!allIndexes.length) {
+    MB.plants = [];
+    renderMBStep1();
+    return;
+  }
+
+  const selectedPhase = MB.plants.length
+    ? _normalizePhase(MB._plants[MB.plants[0]]?.stream_phase)
+    : _normalizePhase(MB._plants[allIndexes[0]]?.stream_phase);
+
+  const nextSelection = allIndexes.filter(i => {
+    const phase = _normalizePhase(MB._plants[i]?.stream_phase);
+    return !selectedPhase || !phase || phase === selectedPhase;
+  });
+
+  MB.plants = nextSelection;
+  renderMBStep1();
+
+  if (nextSelection.length < allIndexes.length) {
+    alert(`Selected all ${selectedPhase || 'compatible'} plants. Some plants were skipped because pipeline maps only support one phase at a time.`);
+  }
+}
+
 function onMBPlantToggle(event, plantIndex) {
   if (event.target.checked) {
     const currentPhases = new Set(
@@ -2629,7 +2745,10 @@ function updateMBStorageName() {
 function renderMBStep1() {
   setWizardStep(1);
   document.getElementById('mb-step1').innerHTML = `
-    <div class="section-label">Select active plants</div>
+    <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Select active plants</span>
+      <button class="btn btn-sm" type="button" onclick="selectAllMBPlants()">Select All</button>
+    </div>
     ${MB._plants.map((p, i) => `
       <label style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;cursor:pointer">
         <input type="checkbox" value="${i}" ${MB.plants.includes(i)?'checked':''}

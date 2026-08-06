@@ -145,6 +145,26 @@ def update_dev_pipeline_map_node_positions(
     _persist_generated_pipeline_maps()
 
 
+def delete_dev_pipeline_map(map_name: str) -> None:
+    """Delete a saved pipeline map and persist the updated map set.
+
+    If the deleted map was the active default, pick the next available map
+    alphabetically; if none remain, clear the active default.
+    """
+    global ACTIVE_AUTO_PIPELINE_MAP
+
+    if map_name not in AUTO_GENERATED_PIPELINE_MAPS:
+        raise KeyError(f"Unknown dev pipeline map '{map_name}'.")
+
+    del AUTO_GENERATED_PIPELINE_MAPS[map_name]
+
+    if ACTIVE_AUTO_PIPELINE_MAP == map_name:
+        remaining_names = sorted(AUTO_GENERATED_PIPELINE_MAPS.keys())
+        ACTIVE_AUTO_PIPELINE_MAP = remaining_names[0] if remaining_names else None
+
+    _persist_generated_pipeline_maps()
+
+
 def apply_dev_pipeline_map(map_name: str | None = None) -> None:
     """Inject dev merge definitions into runtime config for this session.
     

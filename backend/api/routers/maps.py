@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from ..schemas import PipelineMapCreateRequest, PipelineMapInfo, PipelineMapLayoutUpdateRequest
 from backend.pipemapping.dev_pipeline_map import (
     _all_dev_pipeline_maps,
+    delete_dev_pipeline_map,
     register_dev_pipeline_map,
     update_dev_pipeline_map_node_positions,
 )
@@ -118,3 +119,13 @@ def update_map_layout(name: str, body: PipelineMapLayoutUpdateRequest) -> Pipeli
         merge_count=len(updated_map.get("merge_definitions", [])),
         merge_names=list((updated_map.get("merge_pipe_inputs") or {}).keys()),
     )
+
+
+@router.delete("/{name}", status_code=204)
+def delete_map(name: str) -> None:
+    """Delete a saved pipeline map by name."""
+    all_maps = _all_dev_pipeline_maps()
+    if name not in all_maps:
+        raise HTTPException(404, f"Map '{name}' not found.")
+
+    delete_dev_pipeline_map(name)

@@ -24,8 +24,6 @@ def _validate_inputs(
     if not config_plant_inputs:
         raise ValueError("plant_inputs must contain at least one plant.")
 
-    phases_seen: set[str] = set()
-
     for plant_input in config_plant_inputs:
         # Note: Plants may have missing species concentrations (they default to 0.0)
         # No validation needed for missing species
@@ -36,20 +34,12 @@ def _validate_inputs(
                 f"Plant '{plant_input['name']}' must set stream_phase to one of "
                 f"{sorted(VALID_STREAM_PHASES)}."
             )
-        phases_seen.add(stream_phase)
-
         if plant_input["flowrate"] <= 0:
             raise ValueError(f"Plant '{plant_input['name']}' must have a positive flowrate.")
         if plant_input["pipelength"] <= 0:
             raise ValueError(f"Plant '{plant_input['name']}' must have a positive pipelength.")
         if plant_input["pipediameter"] <= 0:
             raise ValueError(f"Plant '{plant_input['name']}' must have a positive pipediameter.")
-
-    if len(phases_seen) > 1:
-        raise ValueError(
-            "Only single-phase systems are allowed. "
-            f"Found mixed phases in plant inputs: {sorted(phases_seen)}"
-        )
 
     for merge_name, merge_input in config_merge_pipe_inputs.items():
         if merge_input["pipelength"] <= 0:

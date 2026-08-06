@@ -1,8 +1,8 @@
 import networkx as nx
 import pytest
 
-from internshipwork.pipemapping import workflow
-from internshipwork.pipemapping.models import WizardState
+from backend.pipemapping import workflow
+from backend.pipemapping.models import WizardState
 
 
 def test_get_default_plant_input_returns_deep_copy(monkeypatch: pytest.MonkeyPatch):

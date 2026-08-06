@@ -4,10 +4,10 @@ import pytest
 
 
 MODULES = [
-    "internshipwork.pipemapping",
-    "internshipwork.pipemapping.dev_pipeline_map",
-    "internshipwork.pipemapping.dialogs",
-    "internshipwork.pipemapping.workflow",
+    "backend.pipemapping",
+    "backend.pipemapping.dev_pipeline_map",
+    "backend.pipemapping.dialogs",
+    "backend.pipemapping.workflow",
 ]
 
 

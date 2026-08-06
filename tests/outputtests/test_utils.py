@@ -1,7 +1,7 @@
 import importlib
 
 
-utils = importlib.import_module("internshipwork.output.utils")
+utils = importlib.import_module("backend.output.utils")
 
 
 def test_infer_output_species_ignores_storage_and_zero_values():

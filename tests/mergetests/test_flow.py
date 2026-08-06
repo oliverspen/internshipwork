@@ -1,6 +1,6 @@
 import pytest
 
-from internshipwork.merge_support import flow
+from backend.merge_support import flow
 
 def test_build_merge_inputs_from_plant_def(monkeypatch: pytest.MonkeyPatch):
     merge_definitions = [

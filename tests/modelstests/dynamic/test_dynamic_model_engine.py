@@ -3,7 +3,7 @@ import importlib
 import pytest
 
 
-dynamic_model_engine = importlib.import_module("internshipwork.models.dynamic.dynamic_model_engine")
+dynamic_model_engine = importlib.import_module("backend.models.dynamic.dynamic_model_engine")
 
 
 def test_run_dynamic_merges_uses_current_flowrate_for_downstream_merge(monkeypatch):

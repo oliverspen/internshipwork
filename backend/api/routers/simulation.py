@@ -212,14 +212,12 @@ def _run_job(
             from backend.models.tocomo import run_reaction
 
             results = run_reaction(
-                save_results=True,
                 progress_callback=_update_progress,
             )
         elif model == "phpitz":
             from backend.models.phpitz_reactive import run_reaction
 
             results = run_reaction(
-                save_results=True,
                 progress_callback=_update_progress,
             )
         elif model == "tocomo_dynamic":

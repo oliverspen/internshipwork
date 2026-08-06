@@ -1,4 +1,4 @@
-from internshipwork.pipemapping.models import Stage, WizardState
+from backend.pipemapping.models import Stage, WizardState
 
 
 def test_wizard_state_defaults_are_initialized():

@@ -1,7 +1,7 @@
 import networkx as nx
 import pytest
 
-from internshipwork.merge_support.topology import build_merge_definitions
+from backend.merge_support.topology import build_merge_definitions
 
 
 def test_build_merge_definitions_orders_merges_topologically():

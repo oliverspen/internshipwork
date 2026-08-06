@@ -1,6 +1,6 @@
 import networkx as nx
 
-from internshipwork.pipemapping.visuals import layered_or_spring_layout
+from backend.pipemapping.visuals import layered_or_spring_layout
 
 
 def test_layered_layout_returns_empty_for_empty_graph():

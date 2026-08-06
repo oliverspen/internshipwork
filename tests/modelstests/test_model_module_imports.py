@@ -4,7 +4,7 @@ import pytest
 
 
 MODULES = [
-    "internshipwork.models.dynamic.flow_calculations.delay",
+    "internshipwork.models.dynamic.delay",
     "internshipwork.models.dynamic.phpitz_dynamic_model",
     "internshipwork.models.dynamic.runner",
     "internshipwork.models.dynamic.tocomo_dynamic_model",

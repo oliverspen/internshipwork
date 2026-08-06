@@ -7,7 +7,7 @@ from typing import Callable
 from backend.output import save_tocomo_results
 from backend.user_inputs import get_input_config
 
-from backend.models.api_client import post_model
+from backend.models.acidwatch_run_file import run_model_with_fallback
 from backend.output.graph import build_graph_from_merge_definitions
 from .pipeline import source_results_for_tocomo, to_tocomo_input_from_source_state
 
@@ -88,14 +88,13 @@ def _build_storage_row(
 
 
 def run_reaction(
-    use_dev_pipeline_map: bool = False,
     save_results: bool = True,
     progress_callback: Callable[[int, int, str | None], None] | None = None,
 ) -> list[dict]:
     """Run TOCOMO chemistry simulation on plants, merges, and storage."""
     results: list[dict] = []
     # Build all source states (plants + merges) that should be evaluated.
-    source_rows = source_results_for_tocomo(use_dev_pipeline_map=use_dev_pipeline_map)
+    source_rows = source_results_for_tocomo()
     total_sources = len(source_rows)
     if progress_callback and total_sources > 0:
         progress_callback(0, total_sources, "Starting")
@@ -117,7 +116,7 @@ def run_reaction(
         )
 
         temperature_kelvin = float(source_state.get("temperature_kelvin", 298.15))
-        final_values = post_model(
+        final_values = run_model_with_fallback(
             "tocomo",
             input_concentrations,
             temperature_kelvin=temperature_kelvin,

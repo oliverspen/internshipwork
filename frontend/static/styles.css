@@ -94,6 +94,7 @@ select:focus { outline: none; border-color: #3182ce; background: white; }
 .status.info    { background: var(--bg-subtle); color: var(--ui-text); display: block; }
 .status.error   { background: #fff5f5; color: #c53030; display: block; }
 .status.success { background: #f0fff4; color: #276749; display: block; }
+.status.warning { background: #fffbeb; color: #92400e; display: block; }
 
 .run-progress {
   margin-top: .75rem;

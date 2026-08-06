@@ -9,7 +9,7 @@ from backend.user_inputs import get_input_config
 
 from backend.output.graph import build_graph_from_merge_definitions
 
-from backend.models.api_client import post_model
+from backend.models.acidwatch_run_file import run_model_with_fallback
 from .pipeline import source_results_for_phpitz_reactive, to_phpitz_reactive_input_from_source_state
 
 
@@ -98,13 +98,12 @@ def _build_storage_row(
 
 
 def run_reaction(
-    use_dev_pipeline_map: bool = False,
     save_results: bool = True,
     progress_callback: Callable[[int, int, str | None], None] | None = None,
 ) -> list[dict]:
     """Run PH_PITZ reactive simulation on plants, merges, and storage."""
     results: list[dict] = []
-    source_rows = source_results_for_phpitz_reactive(use_dev_pipeline_map=use_dev_pipeline_map)
+    source_rows = source_results_for_phpitz_reactive()
     total_sources = len(source_rows)
     if progress_callback and total_sources > 0:
         progress_callback(0, total_sources, "Starting")
@@ -125,7 +124,7 @@ def run_reaction(
         print(f"  [{source_label}] phase={source_state.get('stream_phase', 'unknown')}, density={float(source_state.get('density_kg_per_m3', 0.0)):.3f} kg/m³")
 
         temperature_kelvin = float(source_state.get("temperature_kelvin", 298.15))
-        final_values = post_model(
+        final_values = run_model_with_fallback(
             "phpitz_reactive",
             input_concentrations,
             temperature_kelvin=temperature_kelvin,

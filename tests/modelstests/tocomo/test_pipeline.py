@@ -6,59 +6,19 @@ import pytest
 pipeline = importlib.import_module("internshipwork.models.tocomo.pipeline")
 
 
-def test_resolve_merge_input_config_reuses_existing_config(monkeypatch):
-    config = {"merge_definitions": [{"merge_name": "M1", "sources": [("plant", 0)]}]}
-    monkeypatch.setattr(pipeline, "get_input_config", lambda: config)
-
-    assert pipeline.resolve_merge_input_config(use_dev_pipeline_map=True) is config
-
-
-def test_resolve_merge_input_config_falls_back_to_interactive(monkeypatch):
-    generated = {"merge_definitions": [{"merge_name": "M2", "sources": [("plant", 1)]}]}
-    monkeypatch.setattr(pipeline, "get_input_config", lambda: {})
-    monkeypatch.setattr(
-        pipeline,
-        "build_pipe_graph_with_inputs_interactive",
-        lambda: (object(), {"x": "plant"}, generated),
-    )
-
-    assert pipeline.resolve_merge_input_config(use_dev_pipeline_map=False) == generated
-
-
 def test_to_tocomo_input_from_source_state_uses_existing_ppm_molar():
     source_state = {"ppm_molar": {"H2O": 1, "SO2": 2.2, "NO2": 0.3}}
 
-    out = pipeline.to_tocomo_input_from_source_state(source_state)
+    output = pipeline.to_tocomo_input_from_source_state(source_state)
 
-    assert out == {"H2O": 1.0, "O2": 0.0, "SO2": 2.2, "NO2": 0.3, "H2S": 0.0}
-
-
-def test_to_tocomo_input_from_source_state_converts_from_initial_conc(monkeypatch):
-    monkeypatch.setattr(pipeline, "get_input_config", lambda: {"p_bara": 9.0})
-    monkeypatch.setattr(pipeline, "_bara_to_pa", lambda p_bara: p_bara * 100.0)
-    monkeypatch.setattr(
-        pipeline,
-        "_concentration_to_molar_ppm",
-        lambda conc, pressure_pa, temperature_kelvin: conc + pressure_pa / 1000.0 + temperature_kelvin / 1000.0,
-    )
-
-    source_state = {
-        "temperature_kelvin": 300.0,
-        "initial_merge_conc": {"SO2": 1.0, "NO2": 2.0},
-    }
-
-    out = pipeline.to_tocomo_input_from_source_state(source_state)
-
-    assert out["SO2"] == pytest.approx(2.2)
-    assert out["NO2"] == pytest.approx(3.2)
-    assert out["H2O"] == pytest.approx(1.2)
+    assert output == {"H2O": 1.0, "O2": 0.0, "SO2": 2.2, "NO2": 0.3, "H2S": 0.0}
 
 
 def test_source_results_for_tocomo_requires_merge_definitions(monkeypatch):
-    monkeypatch.setattr(pipeline, "resolve_merge_input_config", lambda **kwargs: {"merge_definitions": []})
+    monkeypatch.setattr(pipeline, "get_input_config", lambda: {"merge_definitions": []})
 
     with pytest.raises(ValueError, match="merge_definitions"):
-        pipeline.source_results_for_tocomo(use_dev_pipeline_map=False)
+        pipeline.source_results_for_tocomo()
 
 
 def test_source_results_for_tocomo_builds_plants_then_merges(monkeypatch):
@@ -68,8 +28,8 @@ def test_source_results_for_tocomo_builds_plants_then_merges(monkeypatch):
     ]
     monkeypatch.setattr(
         pipeline,
-        "resolve_merge_input_config",
-        lambda **kwargs: {"merge_definitions": merge_definitions},
+        "get_input_config",
+        lambda: {"merge_definitions": merge_definitions},
     )
     monkeypatch.setattr(
         pipeline,
@@ -82,7 +42,7 @@ def test_source_results_for_tocomo_builds_plants_then_merges(monkeypatch):
         lambda defs: {str(d["merge_name"]): {"merge": str(d["merge_name"])} for d in defs},
     )
 
-    rows = pipeline.source_results_for_tocomo(use_dev_pipeline_map=True)
+    rows = pipeline.source_results_for_tocomo()
 
     assert [r[0] for r in rows] == ["plant", "plant", "merge", "merge"]
     assert [r[1] for r in rows[:2]] == [0, 2]

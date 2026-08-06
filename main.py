@@ -71,14 +71,12 @@ def run_legacy_workflow() -> None:
 
     if RUN_MODE == "tocomo":
         run_tocomo_reaction(
-            use_dev_pipeline_map=USE_DEV_PIPELINE_MAP,
             save_results=SAVE_RESULTS,
         )
         return
 
     if RUN_MODE == "phpitz_reactive":
         run_phpitz_reactive(
-            use_dev_pipeline_map=USE_DEV_PIPELINE_MAP,
             save_results=SAVE_RESULTS,
         )
         return

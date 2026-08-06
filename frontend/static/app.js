@@ -734,6 +734,14 @@ async function _run(model, mapName) {
     const statusEl = document.getElementById('run-status');
     statusEl.className = 'status success';
     setRunProgress(100);
+    const warningEl = document.getElementById('run-warning');
+    if (result.phase_envelope_warning) {
+      warningEl.className = 'status warning';
+      warningEl.textContent = result.phase_envelope_warning;
+      warningEl.style.display = '';
+    } else {
+      warningEl.style.display = 'none';
+    }
     const completionTextByModel = {
       tocomo: 'TOCOMO model complete',
       phpitz: 'PH_PITZ Reactive model complete',

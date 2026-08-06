@@ -157,6 +157,7 @@ def _build_plant_source_dict(stream_idx: int) -> dict[str, Any]:
         "stream_phase": stream_phase,
         "density_kg_per_m3": _clean_float(stream_density),
         "initial_merge_conc": initial_merge_conc,
+        "ppm_molar": {species: inlet_ppm.get(species, 0.0) for species in SPECIES_ORDER},
         "flow_speed": flow_speed,
         "pipe_time": pipe_time,
     }

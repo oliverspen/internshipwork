@@ -8,7 +8,7 @@ from typing import Any
 from backend.merge_support.calculations import _build_plant_source_dict
 from backend.merge_support.flow import build_merge_inputs_from_definitions
 
-from .service import generate_phase_envelopes_for_network
+from .service import _NEQSIM_UNSUPPORTED, generate_phase_envelopes_for_network
 
 
 def build_source_rows_from_config(
@@ -44,6 +44,15 @@ def generate_phase_envelopes_from_config(
     output_dir: Path,
 ) -> list[Path]:
     """Generate phase envelopes for plant, merge, and storage nodes."""
+    found = {
+        str(species).upper()
+        for plant in config.get("plant_inputs", [])
+        for species, val in (plant.get("inlet_conc") or {}).items()
+        if str(species).upper() in _NEQSIM_UNSUPPORTED and float(val or 0) > 0
+    }
+    if found:
+        raise ValueError("phase envelopes can not be produced due to neqsim specie limitations")
+
     pressure_bara = float(config["p_bara"])
     storage_name = str(config["storage_name"])
     merge_definitions = config.get("merge_definitions") or []

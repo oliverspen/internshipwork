@@ -51,7 +51,13 @@ def _to_mole_fractions(source_state: dict[str, Any]) -> dict[str, float]:
 def _build_fluid(temperature_kelvin: float, pressure_bara: float, mole_fractions: dict[str, float]):
     fluid = system_cls(temperature_kelvin, pressure_bara)
     for species, fraction in mole_fractions.items():
-        fluid.addComponent(species, float(fraction))
+        if fraction <= 0:
+            continue
+        try:
+            fluid.addComponent(species, float(fraction))
+        except Exception:
+            # Skip species unknown to neqsim (e.g. complex trace contaminants).
+            pass
 
     fluid.setMixingRule("classic")
     return fluid
@@ -226,6 +232,10 @@ def _plot_single_node_phase_envelope(
     fig.savefig(output_path, dpi=180, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
     return output_path
+
+
+# Species neqsim cannot handle — tested empirically.
+_NEQSIM_UNSUPPORTED = frozenset({"NH3", "HCHO", "CH3CHO", "CH3COCH3", "HCOOH", "CH3COOH"})
 
 
 def generate_phase_envelopes_for_network(

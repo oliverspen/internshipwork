@@ -1,6 +1,6 @@
 """Simulation endpoints — starts jobs in background threads and exposes a polling endpoint."""
 
-import json
+import math
 import zipfile
 import threading
 import uuid
@@ -132,10 +132,29 @@ def _find_latest_session(model_folder: str) -> str | None:
 
 
 def _to_json_safe(obj: Any) -> Any:
-    """Recursively convert numpy/non-serializable types to JSON-native equivalents."""
-    return json.loads(
-        json.dumps(obj, default=lambda o: float(o) if hasattr(o, "__float__") else str(o))
-    )
+    """Recursively convert values to JSON-safe primitives.
+
+    FastAPI/Starlette JSON responses reject NaN/Infinity by default, so these values
+    must be normalized (to None) before storing into the job payload.
+    """
+    if obj is None or isinstance(obj, (str, bool, int)):
+        return obj
+
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+
+    if isinstance(obj, dict):
+        return {str(key): _to_json_safe(value) for key, value in obj.items()}
+
+    if isinstance(obj, (list, tuple, set)):
+        return [_to_json_safe(value) for value in obj]
+
+    if hasattr(obj, "__float__"):
+        value = float(obj)
+        return value if math.isfinite(value) else None
+
+    # Last resort: string representation for unknown objects.
+    return str(obj)
 
 
 def _build_config_from_request(body: SimulationRequest) -> dict[str, Any]:

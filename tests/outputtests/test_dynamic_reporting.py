@@ -212,8 +212,8 @@ def test_storage_receipt_concentration_uses_fluid_delay():
         dt_days=1.0,
     )
 
-    assert list(table["time_days"]) == [7.0]
-    assert list(table["metric_value"]) == [7.0]
+    assert list(table["time_days"]) == [0.0, 7.0]
+    assert list(table["metric_value"]) == [7.0, 7.0]
 
 
 def test_build_metric_compact_tables_returns_non_empty_merge_and_storage():
@@ -282,7 +282,12 @@ def test_plot_all_dynamic_dashboards_writes_graph_files(tmp_path: Path):
 
     graph_dir = tmp_path / "graphs"
     assert graph_dir.exists()
-    assert list(graph_dir.glob("*.png"))
+    written = {path.name for path in graph_dir.glob("*.png")}
+    assert "flow_graph.png" in written
+    assert "predicted_so2.png" in written
+    assert "inlet_so2.png" in written
+    assert "predicted_no2.png" in written
+    assert "inlet_no2.png" in written
 
 
 def test_plot_dynamic_change_graphs_writes_output_file(tmp_path: Path):

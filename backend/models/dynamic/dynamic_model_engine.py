@@ -313,31 +313,32 @@ def run_dynamic_merges(
                 if collect_plant_rows is not None:
                     plant_input = plant_inputs_step[stream_idx]
                     inlet_conc = plant_input.get("inlet_conc", {})
-                    collect_plant_rows.append(
-                        {
-                            "time_days": round(time_days, 5),
-                            "plant_name": str(plant_input.get("name", stream_idx)),
-                            "temperature_kelvin": current_plant_state["temperature_kelvin"],
-                            "temperature_celsius": current_plant_state["temperature_kelvin"] - 273.0,
-                            "flow_kg_per_h": current_plant_state["total_massflow"],
-                            "stream_phase": current_plant_state["stream_phase"],
-                            "density_kg_per_m3": current_plant_state["density_kg_per_m3"],
-                            "pipe_time_days": round(
-                                float(current_plant_state["pipe_time"]) / SECONDS_PER_DAY,
-                                5,
-                            ),
-                            "pipe_length_m": plant_input.get("pipelength"),
-                            "pipe_diameter_m": plant_input.get("pipediameter"),
-                            "inlet_O2": float(inlet_conc.get("O2", 0.0)),
-                            "inlet_H2O": float(inlet_conc.get("H2O", 0.0)),
-                            "inlet_N2": float(inlet_conc.get("N2", 0.0)),
-                            "inlet_SO2": float(inlet_conc.get("SO2", 0.0)),
-                            "inlet_NO2": float(inlet_conc.get("NO2", 0.0)),
-                            "inlet_NO": float(inlet_conc.get("NO", 0.0)),
-                            "inlet_SO3": float(inlet_conc.get("SO3", 0.0)),
-                            "inlet_H2S": float(inlet_conc.get("H2S", 0.0)),
-                        }
-                    )
+                    plant_row = {
+                        "time_days": round(time_days, 5),
+                        "plant_name": str(plant_input.get("name", stream_idx)),
+                        "temperature_kelvin": current_plant_state["temperature_kelvin"],
+                        "temperature_celsius": current_plant_state["temperature_kelvin"] - 273.0,
+                        "flow_kg_per_h": current_plant_state["total_massflow"],
+                        "stream_phase": current_plant_state["stream_phase"],
+                        "density_kg_per_m3": current_plant_state["density_kg_per_m3"],
+                        "pipe_time_days": round(
+                            float(current_plant_state["pipe_time"]) / SECONDS_PER_DAY,
+                            5,
+                        ),
+                        "pipe_length_m": plant_input.get("pipelength"),
+                        "pipe_diameter_m": plant_input.get("pipediameter"),
+                    }
+
+                    # Capture every configured inlet species so downstream graphing can
+                    # generate species dashboards from actual simulation inputs.
+                    if isinstance(inlet_conc, dict):
+                        for species, value in inlet_conc.items():
+                            species_key = str(species).strip().upper()
+                            if not species_key:
+                                continue
+                            plant_row[f"inlet_{species_key}"] = float(value)
+
+                    collect_plant_rows.append(plant_row)
 
             calculated_merges: dict[str, dict[str, Any]] = {}
 

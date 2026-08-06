@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from backend.models.api_client import post_model
+from backend.models.acidwatch_run_file import run_model_with_fallback
 from backend.models.dynamic.dynamic_model_engine import run_dynamic_merges
 from backend.output.dynamic_reporting import render_dynamic_reports
 from backend.output.excel_export import save_dynamic_excel
@@ -53,7 +53,7 @@ def _evaluate_phpitz_plant(
     temperature_kelvin = float(plant_values.get("temperature_kelvin", 298.15))
     
     # Call PH_PITZ via the shared API client (uses fallback if needed)
-    final_values = post_model(
+    final_values = run_model_with_fallback(
         "phpitz_reactive",
         input_concentrations,
         temperature_kelvin=temperature_kelvin,
@@ -102,7 +102,7 @@ def _evaluate_phpitz_merge(
     temperature_kelvin = float(merge_values.get("temperature_kelvin", 298.15))
     
     # Call PH_PITZ via the shared API client (uses fallback if needed)
-    final_values = post_model(
+    final_values = run_model_with_fallback(
         "phpitz_reactive",
         input_concentrations,
         temperature_kelvin=temperature_kelvin,

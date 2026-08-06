@@ -212,7 +212,6 @@ def _run_job(
             from backend.models.tocomo import run_reaction
 
             results = run_reaction(
-                use_dev_pipeline_map=True,
                 save_results=True,
                 progress_callback=_update_progress,
             )
@@ -220,7 +219,6 @@ def _run_job(
             from backend.models.phpitz_reactive import run_reaction
 
             results = run_reaction(
-                use_dev_pipeline_map=True,
                 save_results=True,
                 progress_callback=_update_progress,
             )
@@ -256,6 +254,7 @@ def _run_job(
         phase_envelope_urls: list[str] = []
         phase_envelope_folder_url: str | None = None
         phase_envelope_zip_url: str | None = None
+        phase_envelope_warning: str | None = None
         if session_id:
             session_dir = _RESULTS_ROOT / folder / session_id
             html_files = list(session_dir.glob("*_map.html"))
@@ -299,7 +298,7 @@ def _run_job(
                     if zip_path is not None:
                         phase_envelope_zip_url = f"/results/{folder}/{session_id}/{quote(zip_path.name)}"
                 except Exception as phase_exc:
-                    print(f"Phase envelope generation skipped for job {job_id}: {phase_exc}")
+                    phase_envelope_warning = str(phase_exc)
 
         _jobs[job_id].update({
             "status": "done",
@@ -313,6 +312,7 @@ def _run_job(
             "phase_envelope_urls": phase_envelope_urls,
             "phase_envelope_folder_url": phase_envelope_folder_url,
             "phase_envelope_zip_url": phase_envelope_zip_url,
+            "phase_envelope_warning": phase_envelope_warning,
             "summary_excel_url": summary_excel_url,
         })
     except Exception as exc:
@@ -338,7 +338,7 @@ def start_simulation(model: str, body: SimulationRequest) -> dict[str, str]:
     _jobs[job_id] = {
         "status": "running", "model": model,
         "session_id": None, "results": None,
-        "html_url": None, "graph_urls": [], "phase_envelope_urls": [], "phase_envelope_folder_url": None, "phase_envelope_zip_url": None, "summary_excel_url": None, "error": None,
+        "html_url": None, "graph_urls": [], "phase_envelope_urls": [], "phase_envelope_folder_url": None, "phase_envelope_zip_url": None, "phase_envelope_warning": None, "summary_excel_url": None, "error": None,
         "progress_pct": 0, "progress_current": 0, "progress_total": 1, "progress_label": "Queued",
     }
     threading.Thread(

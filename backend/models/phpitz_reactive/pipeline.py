@@ -3,24 +3,8 @@
 from typing import Any
 
 from backend.merge_support import build_merge_inputs_from_definitions
-from backend.merge_support.calculations import _bara_to_pa, _build_plant_source_dict, _concentration_to_molar_ppm
-from backend.pipemapping.workflow import build_pipe_graph_with_inputs_interactive
+from backend.merge_support.calculations import _build_plant_source_dict
 from backend.user_inputs import get_input_config
-
-
-def resolve_merge_input_config(use_dev_pipeline_map: bool = False) -> dict[str, object]:
-    """Load merge config from dev map or interactive pipeline builder."""
-    # Note: when use_dev_pipeline_map=True, the map should already be loaded in global
-    # input_config by the caller (main.py calls apply_dev_pipeline_map before runners).
-
-    input_config = get_input_config()
-    if input_config.get("merge_definitions"):
-        # Merge topology already exists in config — no need to build interactively.
-        return input_config
-
-    # No merge definitions found; launch the interactive wizard to build the pipeline.
-    _graph, _node_types, generated_config = build_pipe_graph_with_inputs_interactive()
-    return generated_config
 
 
 def to_phpitz_reactive_input_from_source_state(
@@ -30,39 +14,21 @@ def to_phpitz_reactive_input_from_source_state(
     
     Species are now consistently capitalized (O2, H2O, etc.) throughout the system.
     """
-    # Species supported by PH_PITZ model (now in capitalized form matching AcidWatch output).
-    supported_species = ("H2O", "O2", "N2", "SO2", "NO2", "H2S", "NO")
-
-    if "ppm_molar" in source_state:
-        # Source state already carries pre-computed molar ppm values — use them directly.
-        ppm_molar = source_state["ppm_molar"]
-        return {
-            species: float(ppm_molar.get(species, 0.0))
-            for species in supported_species
-        }
-
-    # Source state holds mass concentrations; convert each species to molar ppm.
-    input_config = get_input_config()
-    pressure_pa = _bara_to_pa(float(input_config["p_bara"]))
-    temperature_kelvin = float(source_state["temperature_kelvin"])
-    initial_conc = source_state["initial_merge_conc"]
+    supported_species = (
+        "H2O", "O2", "N2", "SO2", "NO2", "H2S", "NO",
+        "H2SO4", "HNO3", "S8", "NH3", "N2O", "N2O4", "NH4HSO4",
+        "HCHO", "CH3CHO", "CH3COCH3", "HCOOH", "CH3COOH",
+    )
+    ppm_molar = source_state["ppm_molar"]
     return {
-        species: float(
-            _concentration_to_molar_ppm(
-                float(initial_conc.get(species, 0.0)),
-                pressure_pa,
-                temperature_kelvin,
-            )
-        )
+        species: float(ppm_molar.get(species, 0.0))
         for species in supported_species
     }
 
 
-def source_results_for_phpitz_reactive(
-    use_dev_pipeline_map: bool,
-) -> list[tuple[str, str | int, dict[str, Any]]]:
+def source_results_for_phpitz_reactive() -> list[tuple[str, str | int, dict[str, Any]]]:
     """Collect all plant and merge source states to evaluate with PH_PITZ reactive."""
-    input_config = resolve_merge_input_config(use_dev_pipeline_map=use_dev_pipeline_map)
+    input_config = get_input_config()
     merge_definitions = input_config.get("merge_definitions") or []
 
     # Collect plant indices — from merge sources when merges exist, otherwise all plants.

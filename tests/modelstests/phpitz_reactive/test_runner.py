@@ -53,7 +53,7 @@ def test_run_reaction_without_saving_executes_progress_and_storage(monkeypatch):
         "plant_inputs": [{"name": "Plant 1"}],
     }
 
-    monkeypatch.setattr(phpitz_runner, "source_results_for_phpitz_reactive", lambda **kwargs: source_rows)
+    monkeypatch.setattr(phpitz_runner, "source_results_for_phpitz_reactive", lambda: source_rows)
     monkeypatch.setattr(
         phpitz_runner,
         "to_phpitz_reactive_input_from_source_state",
@@ -68,7 +68,6 @@ def test_run_reaction_without_saving_executes_progress_and_storage(monkeypatch):
 
     progress: list[tuple[int, int, str | None]] = []
     results = phpitz_runner.run_reaction(
-        use_dev_pipeline_map=True,
         save_results=False,
         progress_callback=lambda c, t, lbl: progress.append((c, t, lbl)),
     )
@@ -91,7 +90,7 @@ def test_run_reaction_with_saving_calls_output_pipeline(monkeypatch, tmp_path: P
         "pipeline_map_name": "demo",
     }
 
-    monkeypatch.setattr(phpitz_runner, "source_results_for_phpitz_reactive", lambda **kwargs: source_rows)
+    monkeypatch.setattr(phpitz_runner, "source_results_for_phpitz_reactive", lambda: source_rows)
     monkeypatch.setattr(phpitz_runner, "to_phpitz_reactive_input_from_source_state", lambda state: {"SO2": 1.0})
     monkeypatch.setattr(phpitz_runner, "post_model", lambda *args, **kwargs: {"SO2": 2.0})
     monkeypatch.setattr(phpitz_runner, "get_input_config", lambda: config)
@@ -101,7 +100,7 @@ def test_run_reaction_with_saving_calls_output_pipeline(monkeypatch, tmp_path: P
     session_dir.mkdir()
     monkeypatch.setattr(phpitz_runner, "save_phpitz_reactive_results", lambda *args, **kwargs: str(session_dir))
 
-    results = phpitz_runner.run_reaction(use_dev_pipeline_map=False, save_results=True)
+    results = phpitz_runner.run_reaction(save_results=True)
 
     assert results
     assert results[0]["final"]["SO2"] == 2.0

@@ -127,6 +127,9 @@ def test_build_plant_source_dict(monkeypatch: pytest.MonkeyPatch):
     assert source_dict["density_kg_per_m3"] == pytest.approx(3.52819)
     assert source_dict["flow_speed"] == pytest.approx(40.09739990503085)
     assert source_dict["pipe_time"] == pytest.approx(2493.9272929627896)
+    assert source_dict["ppm_molar"]["SO2"] == pytest.approx(20.0)
+    assert source_dict["ppm_molar"]["NO2"] == pytest.approx(5.0)
+    assert source_dict["ppm_molar"]["CO2"] == pytest.approx(999975.0)
 
     assert set(source_dict["initial_merge_conc"].keys()) == set(expected_initial_merge_conc.keys())
     for species, expected_value in expected_initial_merge_conc.items():

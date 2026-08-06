@@ -76,7 +76,7 @@ def test_run_reaction_without_saving_executes_progress_and_storage(monkeypatch):
         "plant_inputs": [{"name": "Plant 1"}],
     }
 
-    monkeypatch.setattr(tocomo_runner, "source_results_for_tocomo", lambda **kwargs: source_rows)
+    monkeypatch.setattr(tocomo_runner, "source_results_for_tocomo", lambda: source_rows)
     monkeypatch.setattr(
         tocomo_runner,
         "to_tocomo_input_from_source_state",
@@ -91,7 +91,6 @@ def test_run_reaction_without_saving_executes_progress_and_storage(monkeypatch):
 
     progress: list[tuple[int, int, str | None]] = []
     results = tocomo_runner.run_reaction(
-        use_dev_pipeline_map=True,
         save_results=False,
         progress_callback=lambda c, t, lbl: progress.append((c, t, lbl)),
     )
@@ -114,7 +113,7 @@ def test_run_reaction_with_saving_calls_output_pipeline(monkeypatch, tmp_path: P
         "pipeline_map_name": "demo",
     }
 
-    monkeypatch.setattr(tocomo_runner, "source_results_for_tocomo", lambda **kwargs: source_rows)
+    monkeypatch.setattr(tocomo_runner, "source_results_for_tocomo", lambda: source_rows)
     monkeypatch.setattr(tocomo_runner, "to_tocomo_input_from_source_state", lambda state: {"SO2": 1.0})
     monkeypatch.setattr(tocomo_runner, "post_model", lambda *args, **kwargs: {"SO2": 2.0})
     monkeypatch.setattr(tocomo_runner, "get_input_config", lambda: config)
@@ -124,7 +123,7 @@ def test_run_reaction_with_saving_calls_output_pipeline(monkeypatch, tmp_path: P
     session_dir.mkdir()
     monkeypatch.setattr(tocomo_runner, "save_tocomo_results", lambda *args, **kwargs: str(session_dir))
 
-    results = tocomo_runner.run_reaction(use_dev_pipeline_map=False, save_results=True)
+    results = tocomo_runner.run_reaction(save_results=True)
 
     assert results
     assert results[0]["final"]["SO2"] == 2.0

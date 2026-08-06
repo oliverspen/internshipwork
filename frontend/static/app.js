@@ -357,24 +357,6 @@ async function runSimulation() {
   const mapName = document.getElementById('map-sel').value;
   if (!mapName) { status('Select a pipeline map first.', 'error'); return; }
 
-  try {
-    const [mapData, cfg] = await Promise.all([
-      api(`/api/maps/${encodeURIComponent(mapName)}`),
-      api('/api/config/'),
-    ]);
-    const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
-    const mapPlantIndexes = _extractPlantIndexesFromMap(mapData, plantInputs.length);
-    const phaseCheck = _validateSinglePhasePlants(plantInputs, mapPlantIndexes);
-    if (!phaseCheck.ok) {
-      alert(phaseCheck.message);
-      status('Simulation blocked: mixed-phase system detected.', 'error');
-      return;
-    }
-  } catch (e) {
-    status(`Could not validate map phases before run: ${e.message}`, 'error');
-    return;
-  }
-
   await _run(model, mapName);
 }
 
@@ -2507,12 +2489,6 @@ function collectConfig() {
 async function saveConfig() {
   collectConfig();
 
-  const phaseCheck = _validateSinglePhasePlants(_cfg?.plant_inputs || []);
-  if (!phaseCheck.ok) {
-    alert(phaseCheck.message);
-    return;
-  }
-
   try {
     await api('/api/config/', {
       method: 'PUT',
@@ -2621,6 +2597,22 @@ function updateMBPlantsFromStep1() {
   renderMBDraftReview();
 }
 
+function onMBPlantToggle(event, plantIndex) {
+  if (event.target.checked) {
+    const currentPhases = new Set(
+      MB.plants.map(i => _normalizePhase(MB._plants[i]?.stream_phase)).filter(Boolean)
+    );
+    const newPhase = _normalizePhase(MB._plants[plantIndex]?.stream_phase);
+    if (currentPhases.size > 0 && newPhase && !currentPhases.has(newPhase)) {
+      const existingPhase = [...currentPhases][0];
+      alert(`Cannot add plant: phase '${newPhase}' conflicts with existing selection (${existingPhase}). All plants in a pipeline map must have the same phase.`);
+      event.target.checked = false;
+      return;
+    }
+  }
+  updateMBPlantsFromStep1();
+}
+
 function updateMBStorageName() {
   MB.storageName = (document.getElementById('mb-storage-name')?.value || MB.storageName || 'Storage').trim() || 'Storage';
   renderMBDraftReview();
@@ -2633,7 +2625,7 @@ function renderMBStep1() {
     ${MB._plants.map((p, i) => `
       <label style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;cursor:pointer">
         <input type="checkbox" value="${i}" ${MB.plants.includes(i)?'checked':''}
-          onchange="updateMBPlantsFromStep1()">
+          onchange="onMBPlantToggle(event, ${i})">
         <span>${p.name}</span>
         <span style="font-size:.75rem;color:#718096">${p.stream_phase} · ${p.flowrate} kg/hr · ${p.temperature_celsius}°C</span>
       </label>`).join('')}`;

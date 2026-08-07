@@ -115,3 +115,34 @@ def test_build_storage_row_uses_terminal_merges_only():
     assert row["tocomo_input"] == {"SO2": 40.0}
 
     assert row["density_kg_per_m3"] == 13.65749
+
+
+def test_build_storage_row_normalizes_species_key_case():
+    results = [
+        {
+            "source_type": "plant",
+            "source_name": 0,
+            "stream_phase": "gas",
+            "temperature_kelvin": 300.0,
+            "total_massflow": 100.0,
+            "final": {"h2s": 10.0},
+        },
+        {
+            "source_type": "plant",
+            "source_name": 1,
+            "stream_phase": "gas",
+            "temperature_kelvin": 300.0,
+            "total_massflow": 300.0,
+            "final": {"H2S": 30.0},
+        },
+    ]
+
+    row = build_storage_row(
+        results=results,
+        merge_definitions=[],
+        storage_name="Storage",
+        pressure_bara=10.0,
+    )
+
+    assert row is not None
+    assert row["tocomo_input"] == {"H2S": 25.0}

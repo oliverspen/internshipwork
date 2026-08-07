@@ -15,6 +15,32 @@ def test_to_mole_fractions():
     assert result["O2"] == 0.03
     assert sum(result.values()) == 1.0
 
+
+def test_to_mole_fractions_normalizes_species_keys_to_uppercase():
+    raw_conc = {"initial_merge_conc": {
+            "h2s": 3.0,
+            "H2S": 1.0,
+            "co2": 6.0,
+        }}
+
+    result = service._to_mole_fractions(raw_conc)
+
+    assert "h2s" not in result
+    assert "co2" not in result
+    assert result["H2S"] == 0.4
+    assert result["CO2"] == 0.6
+
+
+def test_finite_curve_pairs_keeps_only_true_index_pairs():
+    x = service.np.array([1.0, service.np.nan, 3.0, service.np.nan], dtype=float)
+    y = service.np.array([service.np.nan, 20.0, 30.0, 40.0], dtype=float)
+
+    x_pair, y_pair = service._finite_curve_pairs(x, y)
+
+    # Only index 2 has both finite values; no positional salvage should occur.
+    assert x_pair.tolist() == [3.0]
+    assert y_pair.tolist() == [30.0]
+
 def test_build_fluid():
     temperature_kelvin = 298.15
     pressure_bara = 10.0
@@ -225,18 +251,6 @@ def test_skips_plot_failures(capsys, tmp_path, monkeypatch):
         return output_dir / f"{source_type}_{source_name}.png"
 
     monkeypatch.setattr(service, "_plot_single_node_phase_envelope", fake_plot_single_node_phase_envelope)
-    monkeypatch.setattr(
-        service,
-        "_build_storage_state",
-        lambda source_rows, merge_definitions: {
-            "initial_merge_conc": {"CO2": 1.0},
-            "temperature_kelvin": 300.0,
-            "density_kg_per_m3": 1.0,
-            "total_massflow": 10.0,
-            "stream_phase": "gas",
-        },
-    )
-
     result = service.generate_phase_envelopes_for_network(
         source_rows=source_rows,
         merge_definitions=[{"merge_name": "M1", "sources": [("plant", 0)]}],
@@ -248,7 +262,6 @@ def test_skips_plot_failures(capsys, tmp_path, monkeypatch):
 
     assert result == [
         tmp_path / "merge_M1.png",
-        tmp_path / "storage_Storage.png",
     ]
     captured = capsys.readouterr()
     assert captured.out == ""

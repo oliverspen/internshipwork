@@ -1,10 +1,8 @@
-"""Utility functions for TOCOMO output generation."""
 
 from typing import Any
 
 
 def _celsius_from_kelvin(value: Any) -> float | None:
-    """Convert Kelvin to Celsius when possible."""
     if value is None:
         return None
     try:
@@ -14,7 +12,6 @@ def _celsius_from_kelvin(value: Any) -> float | None:
 
 
 def _round_conc(value: Any) -> float | None:
-    """Round a concentration to 2 decimal places."""
     try:
         return round(float(value), 2)
     except (TypeError, ValueError):
@@ -22,7 +19,6 @@ def _round_conc(value: Any) -> float | None:
 
 
 def infer_allowed_input_species(results: list[dict[str, Any]]) -> list[str]:
-    """Infer model-supported input species that have at least one non-zero value."""
     totals: dict[str, float] = {}
     for row in results:
         if str(row.get("source_type", "")) == "storage":
@@ -33,7 +29,6 @@ def infer_allowed_input_species(results: list[dict[str, Any]]) -> list[str]:
 
 
 def filter_results_for_summary(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return summary-safe rows with concentrations filtered to allowed inputs."""
     allowed = set(infer_allowed_input_species(results))
     filtered_rows: list[dict[str, Any]] = []
 
@@ -57,7 +52,6 @@ def filter_results_for_summary(results: list[dict[str, Any]]) -> list[dict[str, 
 
 
 def infer_output_species(results: list[dict[str, Any]]) -> list[str]:
-    """Collect output species that have at least one non-zero value across non-storage rows."""
     totals: dict[str, float] = {}
     for row in results:
         if str(row.get("source_type", "")) == "storage":
@@ -68,14 +62,12 @@ def infer_output_species(results: list[dict[str, Any]]) -> list[str]:
 
 
 def build_species_columns(results: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
-    """Extract input and output species lists from results."""
     input_species = infer_allowed_input_species(results)
     output_species = infer_output_species(results)
     return input_species, output_species
 
 
 def _plant_name_from_source(source_name: Any, plant_inputs: list[dict[str, Any]] | None = None) -> Any:
-    """Resolve a plant source reference into a display name when possible."""
     if isinstance(source_name, int):
         idx = source_name
     elif isinstance(source_name, str) and source_name.strip().isdigit():
@@ -98,7 +90,6 @@ def build_excel_rows(
     results: list[dict[str, Any]],
     plant_inputs: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Format results into a flat list of dicts for Excel export."""
     input_species, output_species = build_species_columns(results)
     rows: list[dict[str, Any]] = []
     for row in results:
@@ -117,7 +108,6 @@ def build_excel_rows(
         }
         tocomo_input = row.get("tocomo_input", {})
         final_values = row.get("final", {})
-        # Storage has no model output; its incoming composition is stored in tocomo_input.
         is_storage = str(row.get("source_type", "")) == "storage"
         output_source = tocomo_input if is_storage else final_values
         for species in input_species:
@@ -129,7 +119,6 @@ def build_excel_rows(
 
 
 def build_storage_row(storage_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Format storage rows for the separate Storage Results table."""
     rows: list[dict[str, Any]] = []
     for row in storage_results:
         composition = row.get("tocomo_input", {})
@@ -152,7 +141,6 @@ def build_node_labels(
     results: list[dict[str, Any]],
     plant_names: dict[int, str],
 ) -> dict[str, str]:
-    """Build per-node annotation strings from TOCOMO results."""
     labels: dict[str, str] = {}
     for row in results:
         source_type = str(row.get("source_type", ""))
@@ -171,12 +159,10 @@ def build_node_labels(
 
         lines: list[str] = []
         
-        # Add node name as header
         lines.append(node_name)
         lines.append("=" * 20)
         
         if source_type == "storage":
-            # Storage shows initial composition and conditions
             if temperature_kelvin is not None:
                 lines.append(f"T: {temperature_kelvin:.2f} K")
             if total_massflow is not None:
@@ -190,7 +176,6 @@ def build_node_labels(
                     continue
                 lines.append(f"  {species}: {in_v:.1f}")
         else:
-            # Plants and merges show input conditions, then output
             lines.append("Input:")
             if temperature_kelvin is not None:
                 lines.append(f"  T: {temperature_kelvin:.2f} K")

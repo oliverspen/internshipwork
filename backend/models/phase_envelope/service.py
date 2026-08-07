@@ -1,5 +1,3 @@
-"""Generate per-node phase envelope plots for pipeline networks."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,27 +22,20 @@ def _finite_curve_pairs(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.nd
     pair_mask = np.isfinite(x) & np.isfinite(y)
     x_pair = x[pair_mask]
     y_pair = y[pair_mask]
-    if x_pair.size > 1 and y_pair.size > 1:
-        return x_pair, y_pair
-
-    # Some NeqSim outputs contain finite X and Y values at different indices.
-    # If pairwise filtering collapses to <=1 point, salvage by pairing finite
-    # sequences positionally up to their common length.
-    x_finite = x[np.isfinite(x)]
-    y_finite = y[np.isfinite(y)]
-    n = min(x_finite.size, y_finite.size)
-    if n <= 0:
-        return np.array([], dtype=float), np.array([], dtype=float)
-    return x_finite[:n], y_finite[:n]
+    return x_pair, y_pair
 
 
-def _to_mole_fractions(source_state: dict[str, Any]) -> dict[str, float]:
-    raw_conc = source_state["initial_merge_conc"]
+def _to_mole_fractions(source_conc: dict[str, Any]) -> dict[str, float]:
+    raw_conc = source_conc["initial_merge_conc"]
+    inlet_conc: dict[str, float] = {}
+    for species, value in raw_conc.items():
+        normalized_species = str(species).strip().upper()
+        inlet_conc[normalized_species] = inlet_conc.get(normalized_species, 0.0) + max(float(value), 0.0)
 
-    total = sum(max(float(value), 0.0) for value in raw_conc.values())
+    total = sum(inlet_conc.values())
     return {
-        str(species): max(float(value), 0.0) / total
-        for species, value in raw_conc.items()
+        species: value / total
+        for species, value in inlet_conc.items()
     }
 
 
@@ -246,7 +237,7 @@ def generate_phase_envelopes_for_network(
     output_dir: Path,
     plant_names: dict[int, str] | None = None,
 ) -> list[Path]:
-    """Generate per-node phase envelope PNG files for plants, merges, and storage."""
+    """Generate per-node phase envelope PNG files for plants and merges."""
     generated_paths: list[Path] = []
 
     for source_type, source_name, source_state in source_rows:
@@ -268,19 +259,5 @@ def generate_phase_envelopes_for_network(
             generated_paths.append(path)
         except Exception:
             continue
-
-    storage_state = _build_storage_state(source_rows, merge_definitions)
-    if storage_state is not None:
-        try:
-            storage_path = _plot_single_node_phase_envelope(
-                source_type="storage",
-                source_name=storage_name,
-                source_state=storage_state,
-                pressure_bara=pressure_bara,
-                output_dir=output_dir,
-            )
-            generated_paths.append(storage_path)
-        except Exception:
-            pass
 
     return generated_paths

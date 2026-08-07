@@ -1,4 +1,3 @@
-"""Graph reconstruction helpers for model exports."""
 
 from typing import Any
 
@@ -8,12 +7,10 @@ def build_graph_from_merge_definitions(
     plant_names: dict[int, str],
     storage_name: str = "Storage",
 ) -> tuple[Any, dict[str, str]]:
-    """Reconstruct a directed graph and node type mapping from merge definitions."""
     import networkx as nx
 
     graph = nx.DiGraph()
     node_types: dict[str, str] = {}
-    # Add merge nodes and edges from their sources.
     merge_names: set[str] = set()
     upstream_merges: set[str] = set()
     for merge_def in merge_definitions:
@@ -32,17 +29,14 @@ def build_graph_from_merge_definitions(
                 upstream_merges.add(source_merge)
                 graph.add_edge(source_merge, merge_name)
 
-    # Add storage node — connected to the terminal merge, or directly to all plants if no merges.
     storage_node = str(storage_name or "Storage")
     graph.add_node(storage_node)
     node_types[storage_node] = "storage"
     if merge_definitions:
-        # Terminal merges are merges that are never used as an upstream merge source.
         terminal_merges = sorted(merge_names - upstream_merges)
         for merge_name in terminal_merges:
             graph.add_edge(merge_name, storage_node)
     else:
-        # No merges: all plants feed directly into storage.
         for plant_name in plant_names.values():
             graph.add_node(plant_name)
             node_types[plant_name] = "plant"

@@ -5,6 +5,14 @@ from typing import Any
 from backend.merge_support.calculations import _bara_to_pa, _co2_density_kg_per_m3
 
 
+def _normalized_species_values(values: dict[str, Any]) -> dict[str, float]:
+    normalized: dict[str, float] = {}
+    for species, raw_value in values.items():
+        key = str(species).strip().upper()
+        normalized[key] = normalized.get(key, 0.0) + float(raw_value or 0.0)
+    return normalized
+
+
 def build_storage_row(
     results: list[dict[str, Any]],
     merge_definitions: list[dict[str, Any]],
@@ -30,14 +38,19 @@ def build_storage_row(
 
     total_flow = sum(float(row.get("total_massflow") or 0.0) for row in terminal_rows)
 
+    normalized_finals = [
+        _normalized_species_values(row.get("final", {}))
+        for row in terminal_rows
+    ]
+
     all_species: set[str] = set()
-    for row in terminal_rows:
-        all_species.update(row.get("final", {}).keys())
+    for final_values in normalized_finals:
+        all_species.update(final_values.keys())
 
     mixed_composition: dict[str, float] = {
         species: sum(
-            float(row.get("final", {}).get(species, 0.0)) * float(row.get("total_massflow") or 0.0)
-            for row in terminal_rows
+            normalized_final.get(species, 0.0) * float(row.get("total_massflow") or 0.0)
+            for row, normalized_final in zip(terminal_rows, normalized_finals, strict=True)
         )
         / total_flow
         for species in sorted(all_species)

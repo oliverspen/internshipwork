@@ -5,6 +5,14 @@ from typing import Any
 from acidwatch import Client
 
 
+def _normalize_species_keys(values: dict[str, float]) -> dict[str, float]:
+    normalized: dict[str, float] = {}
+    for key, value in values.items():
+        normalized_key = str(key).strip().upper()
+        normalized[normalized_key] = float(value)
+    return normalized
+
+
 def run_model_compat(
     session: Client,
     model_id: str,
@@ -83,14 +91,14 @@ def run_model_with_fallback(
             )
             if df.empty:
                 return {}
-            return {str(k): float(v) for k, v in df.iloc[0].to_dict().items()}
+            return _normalize_species_keys(df.iloc[0].to_dict())
         except Exception:
-            return run_model_compat(
+            return _normalize_species_keys(run_model_compat(
                 session,
                 model_id,
                 input_concentrations,
                 model_params,
                 temperature=temperature_celsius,
                 pressure=pressure_bara,
-            )
+            ))
 

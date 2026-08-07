@@ -240,7 +240,7 @@ def test_run_model_with_fallback_primary_success(monkeypatch):
                 "temperature": temperature,
                 "pressure": pressure,
             })
-            return _FakeDF(row={"SO2": 10, "CO2": "20.5"}, empty=False)
+            return _FakeDF(row={"SO2": 10, "h2s": "20.5"}, empty=False)
 
     monkeypatch.setattr(helpers, "Client", lambda: _ClientCtx())
 
@@ -252,11 +252,11 @@ def test_run_model_with_fallback_primary_success(monkeypatch):
         params={"alpha": 1},
     )
 
-    assert result == {"SO2": 10.0, "CO2": 20.5}
+    assert result == {"SO2": 10.0, "H2S": 20.5}
     assert captured_call["model_id"] == "tocomo"
     assert captured_call["input_concentrations"] == {"SO2": 1.0}
     assert captured_call["params"] == {"alpha": 1}
-    assert captured_call["temperature"] == 26.85
+    assert captured_call["temperature"] == pytest.approx(26.85)
     assert captured_call["pressure"] == 1.0
 
 
@@ -302,7 +302,7 @@ def test_run_model_with_fallback_uses_compat_when_primary_fails(monkeypatch):
         calls["params"] = params
         calls["temperature"] = temperature
         calls["pressure"] = pressure
-        return {"SO2": 4.2}
+        return {"SO2": 4.2, "h2s": 1.1}
 
     monkeypatch.setattr(helpers, "Client", lambda: _ClientCtx())
     monkeypatch.setattr(helpers, "run_model_compat", _fake_compat)
@@ -315,7 +315,7 @@ def test_run_model_with_fallback_uses_compat_when_primary_fails(monkeypatch):
         params={"alpha": 1},
     )
 
-    assert result == {"SO2": 4.2}
+    assert result == {"SO2": 4.2, "H2S": 1.1}
     assert calls["called"] is True
     assert calls["model_id"] == "tocomo"
 

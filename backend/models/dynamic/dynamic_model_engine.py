@@ -1,22 +1,3 @@
-"""Dynamic merge simulation engine with time-stepping and transport delays.
-
-Provides a generic time-stepping framework for evaluating merge properties over time
-with time-varying inlet conditions and transport delays (pipe hold-up times). Supports
-any merge evaluation model (e.g., TOCOMO, custom chemistry) via callback function.
-
-Key features:
-- Time-stepping from t=0 to duration_days
-- Step-hold profile system for time-varying plant inlet conditions
-- Transport delay handling: tracks plant and merge histories and delays source arrival
-- Topological merge resolution: ensures downstream merges use delayed upstream results
-- Per-time-step source collection for reporting (optional)
-
-Note: Flowrate changes are applied instantaneously (no acoustic/speed-of-sound delay).
-
-Main entry point: run_dynamic_merges() accepts a callback function to evaluate each
-merge and returns a list of results indexed by (time_step, merge_name).
-"""
-
 from copy import deepcopy
 from typing import Any, Callable
 
@@ -24,7 +5,6 @@ import numpy as np
 
 from backend.merge_support import build_merge_inputs_from_definitions
 from backend.merge_support.calculations import _build_merge_input_from_source_states, _build_plant_source_dict
-from backend.pipemapping.workflow import build_pipe_graph_with_inputs_interactive
 from backend.user_inputs import clear_runtime_input_config, get_input_config, set_runtime_input_config
 
 
@@ -48,19 +28,6 @@ def delay_time_s(
 
 
 def _step_hold_value(time_days: float, points: list[tuple[float, float]], default_value: float) -> float:
-    """Return a step-held value for time_days from (time_days, value) points.
-    
-    Implements step-hold (zero-order hold) interpolation: returns the most recent
-    point value whose timestamp is <= current time. Used for time-varying profiles.
-    
-    Args:
-        time_days: Current simulation time in days.
-        points: List of (time_days, value) tuples in any order.
-        default_value: Value to use if no points exist or before first point.
-    
-    Returns:
-        Held value at current time (float).
-    """
     # No profile points means we keep the original value.
     if not points:
         return default_value
@@ -81,23 +48,6 @@ def _build_dynamic_input_config(
     dynamic_profile: dict[str, object],
     time_days: float,
 ) -> dict[str, object]:
-    """Create a per-time-step input config by applying profile overrides.
-    
-    Modifies plant_inputs in the config based on dynamic_profile specifications,
-    using step-hold interpolation for each time-varying parameter (flowrate,
-    temperature, stream_phase, inlet_conc). Returns a deep copy so the base
-    config remains unchanged.
-    
-    Args:
-        base_input_config: Base configuration dict with plant_inputs list.
-        dynamic_profile: Dict with 'plant_profiles' key mapping plant names to
-                        profile dicts (keys: flowrate, temperature_celsius,
-                        stream_phase, inlet_conc), each with [(time_days, value)].
-        time_days: Current simulation time in days.
-    
-    Returns:
-        Modified copy of input_config with interpolated plant inlet conditions.
-    """
     # Work on a copy so the base config stays unchanged.
     config = deepcopy(base_input_config)
     # We expect plant_inputs in the config to be a list of plant dictionaries.
@@ -156,33 +106,10 @@ def _build_dynamic_input_config(
 
 
 def resolve_merge_input_config() -> dict[str, object]:
-    """Get a runtime config with merge definitions, prompting once if needed.
-    
-    Returns existing input config if it has merge_definitions. Otherwise,
-    invokes the interactive pipeline mapping wizard to build a config.
-    
-    Returns:
-        Dict with merge_definitions, plant_inputs, and other config keys.
-    """
-    # Use existing merge definitions when already available.
-    input_config = get_input_config()
-    if input_config.get("merge_definitions"):
-        return input_config
-
-    # Otherwise, ask user once to build a pipeline map.
-    _graph, _node_types, generated_config = build_pipe_graph_with_inputs_interactive()
-    return generated_config
+    return get_input_config()
 
 
 def _state_pipe_time_days(source_state: dict[str, Any]) -> float:
-    """Return pipe time in days for a source state (None means no delay).
-    
-    Args:
-        source_state: State dict with optional 'pipe_time' key (seconds).
-    
-    Returns:
-        Pipe time converted to days, or 0.0 if None or negative.
-    """
     pipe_time = source_state.get("pipe_time")
     if pipe_time is None:
         return 0.0
@@ -194,26 +121,8 @@ def _latest_arrived_state(
     current_time_days: float,
     delay_key: str = "pipe_time",
 ) -> dict[str, Any]:
-    """Pick the newest state that has had enough time to travel through its pipe.
-    
-    Implements transport delay: finds the most recent (emit_time, state) pair where
-    arrival_time = emit_time + delay <= current_time. The delay is read from
-    state[delay_key] in seconds (None means no delay). Before the first state
-    arrives, returns the oldest state (startup behavior).
-    
-    Args:
-        history: List of (time_days_emitted, state_dict) sorted by emission time.
-        current_time_days: Current simulation time in days.
-        delay_key: Key in the state dict holding the delay in seconds (default "pipe_time").
-    
-    Returns:
-        The most recent state that has arrived by current_time_days.
-    
-    Raises:
-        ValueError: If history is empty.
-    """
     if not history:
-        raise ValueError("History is empty. Cannot resolve delayed state.")
+        return {}
 
     arrived_state: dict[str, Any] | None = None
     for emit_time_days, state in history:
@@ -239,42 +148,11 @@ def run_dynamic_merges(
     collect_plant_rows: list[dict[str, Any]] | None = None,
     progress_callback: Callable[[int, int, str | None], None] | None = None,
 ) -> list[dict[str, Any]]:
-    """Run a dynamic merge simulation and delegate each merge state to evaluate_merge.
-    
-    Main simulation loop that:
-    1. Iterates from t=0 to duration_days with dt_days steps
-    2. Applies time-varying inlet conditions from dynamic_profile at each step
-    3. Tracks plant and merge history with pipe delays
-    4. Resolves merges in topological order using delayed source states
-    5. Calls evaluate_merge callback for each merge to generate custom output columns
-    6. Optionally collects detailed plant state rows
-    
-    Args:
-        duration_days: Simulation end time in days, or None to auto-derive from max pipe time.
-        dt_days: Time step size in days (must be positive).
-        dynamic_profile: Dict with 'plant_profiles' for time-varying inlet conditions.
-        evaluate_merge: Callback(merge_name, merge_values, time_days) -> dict of extra columns.
-        collect_plant_rows: If provided, appends detailed plant state rows to this list
-                           at each time step.
-    
-    Returns:
-        List of result dicts, one per (time_step, merge_name) pair, with keys:
-        time_days, merge_name, sources, temperature_kelvin, temperature_celsius,
-        flow_kg_per_h, stream_phase, density_kg_per_m3, pipe_time_s, pipe_time_days,
-        pipe_length_m, pipe_diameter_m, plus any columns returned by evaluate_merge.
-    
-    Raises:
-        ValueError: If dt_days <= 0, duration_days cannot be determined, or
-                   merge_definitions not found.
-    """
-    # Time step must be positive.
-    if dt_days <= 0:
-        raise ValueError("dt_days must be positive.")
 
     base_input_config = resolve_merge_input_config()
     merge_definitions = base_input_config.get("merge_definitions")
     if not merge_definitions:
-        raise ValueError("No merge_definitions found. Build a pipeline map first.")
+        return []
 
     # If duration is not set, use the longest merge pipe time.
     baseline_merges = build_merge_inputs_from_definitions(merge_definitions)

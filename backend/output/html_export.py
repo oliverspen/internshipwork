@@ -1,4 +1,3 @@
-"""Interactive HTML map export for TOCOMO results."""
 
 import html
 from pathlib import Path
@@ -15,7 +14,6 @@ def _compute_left_to_right_levels(
     node_types: dict[str, str],
     storage_name: str,
 ) -> dict[str, int]:
-    """Assign stable levels for a left-to-right process-flow layout."""
     levels: dict[str, int] = {}
 
     for node in graph.nodes():
@@ -43,7 +41,6 @@ def _compute_left_to_right_levels(
 
 
 def _tooltip_lines_to_html(title: str, lines: list[str]) -> str:
-    """Convert raw lines into a compact HTML key-value card."""
     rows: list[str] = []
     for raw_line in lines:
         line = str(raw_line).strip()
@@ -116,7 +113,6 @@ def save_interactive_html_map(
     output_path: str | Path,
     pipeline_map_name: str | None = None,
 ) -> Path:
-    """Save an interactive HTML process-flow map with professional styling."""
     graph = graph.copy()
     node_types = dict(node_types)
 
@@ -269,7 +265,6 @@ def save_interactive_html_map(
         )
 
     output = Path(output_path)
-    # generate_html() avoids pyvis trying to os.makedirs("lib") in a read-only CWD
     html_content = net.generate_html()
     html_content = html_content.replace(' src="lib/', ' src="/lib/').replace(' href="lib/', ' href="/lib/')
 

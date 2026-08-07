@@ -1,21 +1,9 @@
-"""Dynamic TOCOMO simulation reporting with tables and plots.
-
-Generates comprehensive reports for time-stepping TOCOMO simulations including:
-- Compact change-point tables (plant and merge states)
-- Multi-panel plots showing species concentrations over time
-- Storage receipt analysis showing final merge conditions at storage node
-- Automatic metric detection based on configured dynamic profiles
-
-Main entry point: render_dynamic_reports() generates all tables and plots.
-"""
-
 import math
 from pathlib import Path
 from typing import Any
 
 import matplotlib
 
-# Use a non-interactive backend for API/background threads (avoids Tk main-loop errors).
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,14 +11,6 @@ import pandas as pd
 
 
 def _infer_dt_days(dynamic_results: list[dict[str, Any]]) -> float:
-    """Infer time step size from simulation results by finding smallest time difference.
-    
-    Args:
-        dynamic_results: List of result dicts with 'time_days' key.
-    
-    Returns:
-        Estimated dt in days, or 0.1 if unable to determine.
-    """
     if not dynamic_results:
         return 0.1
     
@@ -38,7 +18,6 @@ def _infer_dt_days(dynamic_results: list[dict[str, Any]]) -> float:
     if len(times) < 2:
         return 0.1
     
-    # Find smallest non-zero time difference
     diffs = [times[i+1] - times[i] for i in range(len(times)-1) if times[i+1] > times[i]]
     if diffs:
         return min(diffs)
@@ -46,17 +25,6 @@ def _infer_dt_days(dynamic_results: list[dict[str, Any]]) -> float:
 
 
 def _requested_dynamic_metrics(dynamic_profile: dict[str, object]) -> list[dict[str, str]]:
-    """Extract sorted lists of input and output species from results.
-    
-    Scans plant_profiles in the dynamic_profile to detect which metrics were explicitly
-    configured: flow rate, temperature, and inlet species concentrations.
-    
-    Args:
-        dynamic_profile: Dynamic profile dict with 'plant_profiles' key.
-    
-    Returns:
-        List of metric dicts, each with 'name', 'merge_col', 'plant_col', 'storage_col', 'y_label'.
-    """
     plant_profiles = dynamic_profile.get("plant_profiles", {})
     if not isinstance(plant_profiles, dict):
         return []
@@ -117,41 +85,12 @@ def _requested_dynamic_metrics(dynamic_profile: dict[str, object]) -> list[dict[
     return metrics
 
 
-def _dashboard_figsize(metric_count: int) -> tuple[float, float]:
-    """Scale the dashboard figure size to the number of metric columns.
-    
-    Args:
-        metric_count: Number of metrics (species/properties) to plot.
-    
-    Returns:
-        Tuple (width_inches, height_inches) for matplotlib figure.
-    """
-    safe_count = max(1, metric_count)
-    panel_width = 15
-    panel_height = 3.9
-    return panel_width * safe_count, panel_height * 3
-
-
 def _compact_change_table(
     table: pd.DataFrame,
     group_col: str,
     tracked_cols: list[str],
     numeric_cols: list[str],
 ) -> pd.DataFrame:
-    """Keep first row per group and rows where values changed.
-    
-    Implements change-point detection: for each group, includes the first row and any
-    row where a tracked column value differs from the previous row (within tolerance).
-    
-    Args:
-        table: Input DataFrame to compact.
-        group_col: Column name defining groups (e.g., 'merge_name', 'plant_name').
-        tracked_cols: Column names to monitor for changes.
-        numeric_cols: Which of tracked_cols are numeric (for tolerance comparison).
-    
-    Returns:
-        Compacted DataFrame with only first and change-point rows per group.
-    """
     compact_rows: list[pd.Series] = []
     for _group_name, group_table in table.groupby(group_col, sort=False):
         group_table = group_table.sort_values("time_days")
@@ -193,16 +132,6 @@ def _round_numeric_columns(
     numeric_cols: list[str],
     digits: int = 4,
 ) -> pd.DataFrame:
-    """Return a copy with selected numeric columns rounded.
-    
-    Args:
-        table: Input DataFrame.
-        numeric_cols: List of column names to round.
-        digits: Number of decimal places to round to (default 4).
-    
-    Returns:
-        Copy of table with specified columns rounded.
-    """
     rounded = table.copy()
     for col in numeric_cols:
         if col in rounded.columns:
@@ -210,188 +139,7 @@ def _round_numeric_columns(
     return rounded
 
 
-def _print_dynamic_merge_table(dynamic_results: list[dict[str, Any]]) -> None:
-    """Print compact merge rows in per-merge blocks showing change points.
-    
-    Args:
-        dynamic_results: List of merge result dicts from run_dynamic_merges().
-    """
-    flattened_rows: list[dict[str, Any]] = []
-    for result in dynamic_results:
-        row = {
-            "time_days": result["time_days"],
-            "merge_name": result["merge_name"],
-            "sources": result.get("sources", ""),
-            "temperature_celsius": result.get("temperature_celsius"),
-            "flow_kg_per_h": result["flow_kg_per_h"],
-            "stream_phase": result["stream_phase"],
-            "density_kg_per_m3": result["density_kg_per_m3"],
-            "pipe_time_days": result.get("pipe_time_days"),
-            "pipe_length_m": result.get("pipe_length_m"),
-            "pipe_diameter_m": result.get("pipe_diameter_m"),
-        }
-        for species, value in result.get("final", {}).items():
-            row[f"final_{species}"] = value
-        flattened_rows.append(row)
-
-    merge_table = pd.DataFrame(flattened_rows)
-    merge_compact_table = _compact_change_table(
-        merge_table,
-        group_col="merge_name",
-        tracked_cols=[
-            "temperature_celsius",
-            "flow_kg_per_h",
-            "stream_phase",
-            "density_kg_per_m3",
-            "pipe_time_days",
-            "pipe_length_m",
-            "pipe_diameter_m",
-            "final_H2O",
-            "final_SO2",
-            "final_NO2",
-            "final_H2S",
-            "final_NO",
-        ],
-        numeric_cols=[
-            "temperature_celsius",
-            "flow_kg_per_h",
-            "density_kg_per_m3",
-            "pipe_time_days",
-            "pipe_length_m",
-            "pipe_diameter_m",
-            "final_H2O",
-            "final_SO2",
-            "final_NO2",
-            "final_H2S",
-            "final_NO",
-        ],
-    )
-
-    merge_compact_table = _round_numeric_columns(
-        merge_compact_table,
-        numeric_cols=[
-            "time_days",
-            "temperature_celsius",
-            "flow_kg_per_h",
-            "density_kg_per_m3",
-            "pipe_time_days",
-            "pipe_length_m",
-            "pipe_diameter_m",
-            "final_H2O",
-            "final_SO2",
-            "final_NO2",
-            "final_H2S",
-            "final_NO",
-        ],
-    )
-
-    print("Merge change points (grouped):")
-    for merge_name, merge_group in merge_compact_table.groupby("merge_name", sort=False):
-        merge_group = merge_group.sort_values("time_days")
-        first_row = merge_group.iloc[0]
-        print()
-        print(f"{merge_name}")
-
-        table_cols = [
-            "pipe_time_days",
-        ]
-        table_cols = [col for col in table_cols if col in merge_group.columns]
-        print(merge_group[table_cols].to_string(index=False))
-
-
-def _print_dynamic_plant_table(plant_results: list[dict[str, Any]]) -> None:
-    """Print compact plant rows in per-plant blocks showing change points.
-    
-    Args:
-        plant_results: List of plant state dicts collected during simulation.
-    """
-    if not plant_results:
-        return
-
-    plant_table = pd.DataFrame(plant_results)
-    plant_compact_table = _compact_change_table(
-        plant_table,
-        group_col="plant_name",
-        tracked_cols=[
-            "temperature_celsius",
-            "flow_kg_per_h",
-            "stream_phase",
-            "density_kg_per_m3",
-            "pipe_time_days",
-            "pipe_length_m",
-            "pipe_diameter_m",
-            "inlet_O2",
-            "inlet_H2O",
-            "inlet_SO2",
-            "inlet_NO2",
-            "inlet_NO",
-            "inlet_SO3",
-            "inlet_H2S",
-        ],
-        numeric_cols=[
-            "temperature_celsius",
-            "flow_kg_per_h",
-            "density_kg_per_m3",
-            "pipe_time_days",
-            "pipe_length_m",
-            "pipe_diameter_m",
-            "inlet_O2",
-            "inlet_H2O",
-            "inlet_SO2",
-            "inlet_NO2",
-            "inlet_NO",
-            "inlet_SO3",
-            "inlet_H2S",
-        ],
-    )
-
-    plant_compact_table = _round_numeric_columns(
-        plant_compact_table,
-        numeric_cols=[
-            "time_days",
-            "temperature_celsius",
-            "flow_kg_per_h",
-            "density_kg_per_m3",
-            "pipe_time_days",
-            "pipe_length_m",
-            "pipe_diameter_m",
-            "inlet_O2",
-            "inlet_H2O",
-            "inlet_SO2",
-            "inlet_NO2",
-            "inlet_NO",
-            "inlet_SO3",
-            "inlet_H2S",
-        ],
-    )
-
-    print()
-    print("Plant change points (grouped):")
-    for plant_name, plant_group in plant_compact_table.groupby("plant_name", sort=False):
-        plant_group = plant_group.sort_values("time_days")
-        first_row = plant_group.iloc[0]
-        print()
-        print(f"{plant_name}")
-
-        table_cols = [
-            "time_days",
-            "temperature_celsius",
-            "flow_kg_per_h",
-            "pipe_time_days",
-            "inlet_O2",
-            "inlet_H2O",
-            "inlet_SO2",
-            "inlet_NO2",
-            "inlet_NO",
-            "inlet_SO3",
-            "inlet_H2S",
-        ]
-        table_cols = [col for col in table_cols if col in plant_group.columns]
-        print(plant_group[table_cols].to_string(index=False))
-
-
 def _format_change_annotation(previous: float, new: float, time_days: float) -> str:
-    """Format change-point text with timestamp only."""
     return f"t={time_days:.2f} d"
 
 
@@ -404,7 +152,6 @@ def _plot_group_step_series(
     legend_title: str,
     x_end: float,
 ) -> set[float]:
-    """Plot grouped step series with markers and annotations on real change points only."""
     if value_col not in table.columns or table.empty:
         return set()
 
@@ -421,14 +168,10 @@ def _plot_group_step_series(
         x_plot = x
         y_plot = y
 
-        # Extend the last plateau to the plot boundary so the line does not
-        # visually stop at the final data point.
         if float(x.iloc[-1]) < x_end:
             x_plot = pd.concat([x_plot, pd.Series([x_end])], ignore_index=True)
             y_plot = pd.concat([y_plot, pd.Series([float(y.iloc[-1])])], ignore_index=True)
 
-        # With a single timestamp, step() has no visible horizontal segment,
-        # so the extension above creates that visible run-out.
 
         ax.step(
             x_plot,
@@ -505,7 +248,6 @@ def _plot_group_step_series(
 
 
 def _build_storage_receipt_table(dynamic_results: list[dict[str, Any]], dt_days: float = 0.1) -> pd.DataFrame:
-    """Build storage receipt rows from terminal merges with arrival-time snapped to next dt step."""
     merge_table = pd.DataFrame(dynamic_results)
     if merge_table.empty:
         return pd.DataFrame()
@@ -532,7 +274,6 @@ def _build_storage_receipt_table(dynamic_results: list[dict[str, Any]], dt_days:
         errors="coerce",
     ).fillna(0.0)
 
-    # Flowrate is assumed to propagate instantaneously.
     raw_arrival_time = (
         pd.to_numeric(terminal_rows["time_days"], errors="coerce")
         + terminal_rows["acoustic_pipe_time_days"]
@@ -546,7 +287,6 @@ def _build_storage_receipt_table(dynamic_results: list[dict[str, Any]], dt_days:
 
 
 def _ensure_merge_metric_column(merge_table: pd.DataFrame, value_col: str) -> pd.DataFrame:
-    """Ensure a metric column exists, deriving final_* values from nested TOCOMO output."""
     resolved = merge_table.copy()
     if value_col in resolved.columns:
         return resolved
@@ -567,7 +307,6 @@ def _ensure_merge_metric_column(merge_table: pd.DataFrame, value_col: str) -> pd
 
 
 def _dynamic_profile_has_flow_changes(dynamic_profile: dict[str, object]) -> bool:
-    """Return True when any plant profile defines at least one flowrate change point."""
     plant_profiles = dynamic_profile.get("plant_profiles", {})
     if not isinstance(plant_profiles, dict):
         return False
@@ -582,7 +321,6 @@ def _dynamic_profile_has_flow_changes(dynamic_profile: dict[str, object]) -> boo
 
 
 def _dynamic_profile_has_inlet_concentration_changes(dynamic_profile: dict[str, object]) -> bool:
-    """Return True when any plant profile defines inlet concentration change points."""
     plant_profiles = dynamic_profile.get("plant_profiles", {})
     if not isinstance(plant_profiles, dict):
         return False
@@ -600,12 +338,6 @@ def _dynamic_profile_has_inlet_concentration_changes(dynamic_profile: dict[str, 
 
 
 def _use_instantaneous_storage_composition(dynamic_profile: dict[str, object]) -> bool:
-    """Use instantaneous storage composition timing for flow-driven scenarios.
-
-    When concentration changes are induced by flowrate updates (and there are no
-    explicit inlet concentration step changes), align storage timing with the
-    model's instantaneous flow propagation assumption.
-    """
     return (
         _dynamic_profile_has_flow_changes(dynamic_profile)
         and not _dynamic_profile_has_inlet_concentration_changes(dynamic_profile)
@@ -618,11 +350,6 @@ def _build_storage_receipt_table_for_column(
     dt_days: float = 0.1,
     composition_instantaneous: bool = False,
 ) -> pd.DataFrame:
-    """Build storage receipt rows for a selected merge output column, snapped to next dt step.
-
-    For concentration-like metrics, include a t=0 baseline point per storage stream
-    using the first known terminal value so storage charts start immediately.
-    """
     merge_table = _ensure_merge_metric_column(pd.DataFrame(dynamic_results), value_col)
     if merge_table.empty or value_col not in merge_table.columns:
         return pd.DataFrame()
@@ -650,9 +377,6 @@ def _build_storage_receipt_table_for_column(
         errors="coerce",
     ).fillna(0.0)
 
-    # Flowrate changes are instantaneous. For composition metrics we can also use
-    # instantaneous timing in flow-driven scenarios where inlet concentrations are
-    # not explicitly being stepped.
     use_instantaneous = value_col == "flow_kg_per_h" or (
         composition_instantaneous and value_col.startswith("final_")
     )
@@ -668,8 +392,6 @@ def _build_storage_receipt_table_for_column(
 
     storage_rows = terminal_rows[["time_days", "storage_stream", "metric_value"]]
 
-    # Keep flow behavior unchanged (arrival-only). For composition metrics, add a
-    # day-0 baseline using the first known terminal value to avoid late chart starts.
     if value_col != "flow_kg_per_h":
         first_rows = (
             terminal_rows.sort_values("time_days")
@@ -697,13 +419,11 @@ def _plot_metric_dashboard(
     subtitle: str,
     y_label: str,
 ) -> None:
-    """Plot merge, plant, and storage dashboards for a selected metric."""
     if not dynamic_results:
         return
 
     merge_table = _ensure_merge_metric_column(pd.DataFrame(dynamic_results), merge_value_col)
     if merge_value_col not in merge_table.columns:
-        print(f"Skipping dashboard '{title}': missing column {merge_value_col}")
         return
 
     merge_metric = merge_table[["time_days", "merge_name", merge_value_col]].rename(
@@ -862,8 +582,6 @@ def _plot_metric_dashboard(
     output = Path(output_path)
     fig.savefig(output, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print()
-    print(f"Saved dynamic graph: {output.resolve()}")
 
 
 def _build_metric_compact_tables(
@@ -874,7 +592,6 @@ def _build_metric_compact_tables(
     storage_value_col: str,
     composition_instantaneous: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, float]:
-    """Prepare compact merge/plant/storage tables for one metric."""
     merge_table = _ensure_merge_metric_column(pd.DataFrame(dynamic_results), merge_value_col)
     if merge_table.empty or merge_value_col not in merge_table.columns:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), 1.0
@@ -933,17 +650,8 @@ def _infer_all_metrics(
     dynamic_results: list[dict[str, Any]],
     plant_results: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
-    """Infer all plottable metrics from actual simulation data.
-    
-    Produces metrics for flowrate plus every contaminant species found in the results,
-    regardless of what was explicitly configured in the dynamic profile.
-    
-    Returns:
-        List of metric dicts with 'name', 'merge_col', 'plant_col', 'storage_col', 'y_label'.
-    """
     metrics: list[dict[str, str]] = []
 
-    # Always include flow rate
     metrics.append(
         {
             "name": "Flow",
@@ -954,7 +662,6 @@ def _infer_all_metrics(
         }
     )
 
-    # Include temperature when present in simulation outputs.
     has_temperature = any("temperature_celsius" in row for row in dynamic_results) or any(
         "temperature_celsius" in row for row in plant_results
     )
@@ -969,21 +676,18 @@ def _infer_all_metrics(
             }
         )
 
-    # Collect all output species from "final" dicts in merge results
     output_species: set[str] = set()
     for result in dynamic_results:
         final_dict = result.get("final", {})
         if isinstance(final_dict, dict):
             output_species.update(final_dict.keys())
 
-    # Collect all inlet species from plant results
     inlet_species: set[str] = set()
     for result in plant_results:
         for key in result.keys():
             if key.startswith("inlet_"):
                 inlet_species.add(key[len("inlet_"):])
 
-    # Build one metric per species (union of output and inlet species)
     all_species = sorted({str(species).upper() for species in output_species | inlet_species})
     for species in all_species:
         metrics.append(
@@ -1004,11 +708,9 @@ def _metric_has_changes(
     plant_results: list[dict[str, Any]],
     metric: dict[str, str],
 ) -> bool:
-    """Return True if a metric has at least one value change across all results."""
     merge_col = metric["merge_col"]
     plant_col = metric["plant_col"]
 
-    # Check merge results
     merge_values = []
     for r in dynamic_results:
         if merge_col == "flow_kg_per_h":
@@ -1025,7 +727,6 @@ def _metric_has_changes(
     if len(set(merge_values)) > 1:
         return True
 
-    # Check plant results
     plant_values = []
     for r in plant_results:
         v = r.get(plant_col)
@@ -1036,7 +737,6 @@ def _metric_has_changes(
 
 
 def _has_predicted_species(dynamic_results: list[dict[str, Any]], species: str) -> bool:
-    """Return True when any merge final payload contains the species."""
     target = str(species).strip().upper()
     for result in dynamic_results:
         final_payload = result.get("final", {})
@@ -1046,7 +746,6 @@ def _has_predicted_species(dynamic_results: list[dict[str, Any]], species: str) 
 
 
 def _has_inlet_species(plant_results: list[dict[str, Any]], species: str) -> bool:
-    """Return True when any plant row includes the inlet species column."""
     col = f"inlet_{str(species).strip().upper()}"
     return any(col in row for row in plant_results)
 
@@ -1057,13 +756,11 @@ def plot_all_dynamic_dashboards(
     dynamic_profile: dict[str, object],
     output_path: str = "dynamic_change_points.png",
 ) -> None:
-    """Save one dashboard PNG per metric (flowrate + every contaminant species)."""
     if not dynamic_results:
         return
 
     metrics = _infer_all_metrics(dynamic_results, plant_results)
     if not metrics:
-        print("No metrics found in simulation results; skipping graphs.")
         return
 
     plt.rcParams.update(
@@ -1153,7 +850,6 @@ def plot_all_dynamic_dashboards(
         fig.suptitle(f"Dynamic Changes — {metric['name']}", fontsize=16, fontweight="bold", y=0.99)
         fig.tight_layout(rect=(0.03, 0.02, 0.85, 0.97))
 
-        # Save one or more files per metric in graphs/ subfolder with species grouping.
         if metric["name"] == "Flow":
             file_names = ["flow_graph.png"]
         elif metric["name"] == "Temperature":
@@ -1175,7 +871,6 @@ def plot_all_dynamic_dashboards(
             saved_paths.append(metric_path)
         plt.close(fig)
 
-    print(f"Saved {len(saved_paths)} graph(s) to: {graph_dir}")
 
 
 def plot_dynamic_change_graphs(
@@ -1183,7 +878,6 @@ def plot_dynamic_change_graphs(
     plant_results: list[dict[str, Any]],
     output_path: str = "dynamic_change_points.png",
 ) -> None:
-    """Create a publication-style engineering dashboard for flow change points."""
     if not dynamic_results:
         return
 
@@ -1355,8 +1049,6 @@ def plot_dynamic_change_graphs(
     output = Path(output_path)
     fig.savefig(output, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print()
-    print(f"Saved dynamic change graph: {output.resolve()}")
 
 
 def render_dynamic_reports(
@@ -1365,7 +1057,6 @@ def render_dynamic_reports(
     dynamic_profile: dict[str, object],
     graph_output_path: str = "dynamic_change_points.png",
 ) -> None:
-    """Save dashboard graph."""
     plot_all_dynamic_dashboards(
         dynamic_results,
         plant_results,

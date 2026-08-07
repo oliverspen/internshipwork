@@ -6,7 +6,22 @@ async function api(path, opts = {}) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(_extractApiErrorMessage(body, res.statusText));
   }
-  return res.json();
+
+  // Some successful endpoints intentionally return no body (e.g., 204 delete).
+  if (res.status === 204 || res.status === 205) return null;
+
+  const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    return res.json();
+  }
+
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 function _isTransientFetchError(error) {
@@ -151,36 +166,60 @@ function fmtCelsiusFromKelvin(v, digits = 2) {
 
 // Load maps
 
-async function loadMaps() {
+async function loadMaps(preferredMapName = null, options = {}) {
+  const shouldOpenPopup = Boolean(options?.openPopup);
   try {
     const maps = await api('/api/maps/');
     const sel = document.getElementById('map-sel');
     const list = document.getElementById('map-list');
-    const previousSelection = sel.value;
+    const previousSelection = String(sel?.value || '').trim();
 
-    sel.innerHTML = maps.length
-      ? maps.map(m => `<option value="${m.name}">${m.name}</option>`).join('')
-      : '<option value="">No maps saved</option>';
+    let selectedMapName = '';
+    if (maps.length) {
+      const preferred = String(preferredMapName || '').trim();
+      if (preferred && maps.some(m => m.name === preferred)) {
+        selectedMapName = preferred;
+      } else if (previousSelection && maps.some(m => m.name === previousSelection)) {
+        selectedMapName = previousSelection;
+      } else {
+        selectedMapName = String(maps[0].name);
+      }
+    }
+    if (sel) {
+      sel.value = selectedMapName;
+    }
 
     if (list) {
       list.innerHTML = maps.length
         ? maps.map(map => `
             <div class="map-item">
-              <button class="map-item-select" type="button" onclick="selectMapFromList(${JSON.stringify(map.name)})">
+              <div class="map-item-details">
                 <span class="map-item-name">${_esc(map.name)}</span>
                 <span class="map-item-meta">${map.merge_count} merge${map.merge_count === 1 ? '' : 's'}</span>
-              </button>
-              <button class="btn btn-sm map-item-delete" type="button" onclick="deleteMapFromList(${JSON.stringify(map.name)})">Delete</button>
+              </div>
+              <div class="map-item-actions">
+                <button
+                  class="btn btn-sm map-item-pick ${selectedMapName === map.name ? 'is-active' : ''}"
+                  type="button"
+                  data-map-name="${encodeURIComponent(String(map.name))}"
+                  onclick="selectMapFromList(decodeURIComponent(this.dataset.mapName))">Select</button>
+                <button
+                  class="btn btn-sm map-item-delete"
+                  type="button"
+                  data-map-name="${encodeURIComponent(String(map.name))}"
+                  onclick="deleteMapFromList(decodeURIComponent(this.dataset.mapName))">Delete</button>
+              </div>
             </div>
           `).join('')
         : '<div class="empty">No maps saved</div>';
     }
 
     if (maps.length) {
-      if (previousSelection && maps.some(m => m.name === previousSelection)) {
-        sel.value = previousSelection;
+      if (shouldOpenPopup) {
+        await onMapSelectionChange({ openPopup: true });
+      } else {
+        await previewSelectedMap();
       }
-      await previewSelectedMap();
     } else {
       showMapPreviewMessage('No saved maps yet. Create one to preview it here.');
     }
@@ -193,7 +232,7 @@ function selectMapFromList(mapName) {
   const sel = document.getElementById('map-sel');
   if (!sel) return;
   sel.value = mapName;
-  onMapSelectionChange();
+  loadMaps(mapName, { openPopup: true });
 }
 
 async function deleteMapFromList(mapName) {
@@ -268,6 +307,15 @@ function _validateSinglePhasePlants(plantInputs, plantIndexes = null) {
 }
 
 function _extractPlantIndexesFromMap(mapData, fallbackPlantCount = 0) {
+  const selected = Array.isArray(mapData?.selected_plant_indexes)
+    ? mapData.selected_plant_indexes
+      .map(idx => Number(idx))
+      .filter(idx => Number.isInteger(idx) && idx >= 0)
+    : [];
+  if (selected.length) {
+    return Array.from(new Set(selected)).sort((a, b) => a - b);
+  }
+
   const defs = Array.isArray(mapData?.merge_definitions) ? mapData.merge_definitions : [];
   const indexes = new Set();
 
@@ -330,7 +378,8 @@ function renderMapVariablesPopup(mapName, mapData, plantInputs = []) {
   `;
 }
 
-async function onMapSelectionChange() {
+async function onMapSelectionChange(options = {}) {
+  const shouldOpenPopup = options?.openPopup !== false;
   const mapName = document.getElementById('map-sel').value;
   if (!mapName) {
     showMapPreviewMessage('Select a pipeline map to preview it here.');
@@ -345,7 +394,9 @@ async function onMapSelectionChange() {
     _currentPlantInputs = plantInputs;
     renderMapPreview(mapName, mapData, plantInputs, null, 'Previewing saved map', { interactive: true });
     renderMapVariablesPopup(mapName, mapData, plantInputs);
-    openModal('map-vars-modal');
+    if (shouldOpenPopup) {
+      openModal('map-vars-modal');
+    }
   } catch (e) {
     showMapPreviewMessage(`Could not load map preview: ${e.message}`);
   }
@@ -720,12 +771,17 @@ async function quickRun(mapName) {
 
 async function _run(model, mapName) {
   const btn = document.getElementById('run-btn');
+  const mapSelector = document.getElementById('map-sel');
+  if (mapSelector) mapSelector.value = mapName;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Starting…';
   clearStatus();
   setRunProgress(0);
 
   try {
+    let popupMapData = null;
+    let popupPlantInputs = [];
+
     const body = { map_name: mapName };
     if (_isDynamicModel(model)) {
       const dtInput = Number(document.getElementById('dynamic-dt-days')?.value);
@@ -767,6 +823,8 @@ async function _run(model, mapName) {
         dynamicMapData = mapData;
         dynamicPlantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
         _currentPlantInputs = dynamicPlantInputs;
+        popupMapData = mapData;
+        popupPlantInputs = dynamicPlantInputs;
       } catch {
         // Keep graphs visible even if map preview data fails to load.
       }
@@ -778,6 +836,8 @@ async function _run(model, mapName) {
       const [mapData, cfg] = await _loadMapAndConfigWithRetry(mapName);
       const plantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
       _currentPlantInputs = plantInputs;
+      popupMapData = mapData;
+      popupPlantInputs = plantInputs;
       renderMapPreview(
         mapName,
         mapData,
@@ -788,6 +848,20 @@ async function _run(model, mapName) {
       );
       setMapPanelTitle('Interactive Pipeline Map');
       showTable(result.results);
+    }
+
+    if (!popupMapData) {
+      try {
+        const [mapData, cfg] = await _loadMapAndConfigWithRetry(mapName);
+        popupMapData = mapData;
+        popupPlantInputs = Array.isArray(cfg?.plant_inputs) ? cfg.plant_inputs : [];
+      } catch {
+        // Ignore popup refresh failures when simulation succeeded.
+      }
+    }
+    if (popupMapData) {
+      renderMapVariablesPopup(mapName, popupMapData, popupPlantInputs);
+      openModal('map-vars-modal');
     }
 
     const statusEl = document.getElementById('run-status');
@@ -1673,6 +1747,7 @@ function renderMapPreview(
   if (!placeholder) return;
 
   const defs = Array.isArray(mapData?.merge_definitions) ? mapData.merge_definitions : [];
+  const selectedPlantIndexes = _extractPlantIndexesFromMap(mapData, plantInputs.length);
 
   const nodes = new Map();
   const edges = [];
@@ -1700,6 +1775,13 @@ function renderMapPreview(
       }
     });
   });
+
+  if (!defs.length) {
+    selectedPlantIndexes.forEach(plantIndex => {
+      const id = `plant:${plantIndex}`;
+      addNode(id, _plantLabelByIndex(plantInputs, plantIndex), 'plant', { plantIndex });
+    });
+  }
 
   const storageName = String(mapData?.storage_name || 'Storage').trim() || 'Storage';
   const storageId = `storage:${storageName}`;
@@ -2142,7 +2224,6 @@ document.getElementById('model-sel').addEventListener('change', () => {
   }
   loadSessions();
 });
-document.getElementById('map-sel').addEventListener('change', onMapSelectionChange);
 loadMaps();
 updateDynamicRunSettingsVisibility();
 loadSessions();
@@ -3330,13 +3411,14 @@ async function saveMBMap() {
         pipeline_map: {
           merge_definitions: mergeDefinitions,
           merge_pipe_inputs: mergePipeInputs,
+          selected_plant_indexes: MB.plants,
           storage_name: MB.storageName,
           node_positions: nodePositions,
         },
       }),
     });
     closeModal('map-modal');
-    loadMaps();
+    await loadMaps(targetMapName, { openPopup: true });
   } catch (e) {
     alert('Save failed: ' + e.message);
   }

@@ -54,6 +54,7 @@ def create_map(body: PipelineMapCreateRequest) -> PipelineMapInfo:
         map_name=body.name,
         merge_definitions=merge_definitions,
         merge_pipe_inputs=merge_pipe_inputs,
+        selected_plant_indexes=body.pipeline_map.selected_plant_indexes or [],
         storage_name=(body.pipeline_map.storage_name or "Storage").strip() or "Storage",
         node_positions=node_positions,
     )
@@ -89,6 +90,7 @@ def update_map(name: str, body: PipelineMapCreateRequest) -> PipelineMapInfo:
         map_name=name,
         merge_definitions=merge_definitions,
         merge_pipe_inputs=merge_pipe_inputs,
+        selected_plant_indexes=body.pipeline_map.selected_plant_indexes or [],
         storage_name=(body.pipeline_map.storage_name or "Storage").strip() or "Storage",
         node_positions=node_positions,
     )

@@ -35,13 +35,13 @@
       <button class="btn btn-edit-vars-large" onclick="openConfigEditor()">Edit Variables</button>
 
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem;">
-        <label for="map-sel" style="margin:0">Pipeline Map</label>
+        <label style="margin:0">Pipeline Maps</label>
         <div style="display:flex;gap:.35rem;">
           <button class="btn btn-sm" onclick="openMapEditor()" style="font-size:.75rem;padding:.2rem .55rem;">Edit</button>
           <button class="btn btn-sm" onclick="openMapBuilder()" style="font-size:.75rem;padding:.2rem .55rem;">&#43; New</button>
         </div>
       </div>
-      <select id="map-sel"><option value="">Loading…</option></select>
+      <input id="map-sel" type="hidden" value="">
       <div id="map-list" class="map-list" aria-label="Saved pipeline maps"></div>
 
       <div id="dynamic-run-settings" style="display:none;margin-top:.65rem;padding:.6rem;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
@@ -60,7 +60,7 @@
         </div>
       </div>
 
-      <button class="btn btn-primary" id="run-btn" onclick="runSimulation()">▶ Run</button>
+      <button class="btn btn-primary run-btn-spaced" id="run-btn" onclick="runSimulation()">▶ Run</button>
       <div id="run-progress" class="run-progress" aria-live="polite" style="display:none">
         <div id="run-progress-pct" class="run-progress-pct">0%</div>
         <div class="run-progress-track">

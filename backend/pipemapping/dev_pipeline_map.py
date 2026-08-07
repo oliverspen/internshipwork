@@ -111,6 +111,7 @@ def register_dev_pipeline_map(
     map_name: str,
     merge_definitions: list[dict[str, object]],
     merge_pipe_inputs: dict[str, dict[str, float]],
+    selected_plant_indexes: list[int] | None = None,
     storage_name: str = "Storage",
     node_positions: dict[str, dict[str, float]] | None = None,
 ) -> None:
@@ -127,6 +128,7 @@ def register_dev_pipeline_map(
     AUTO_GENERATED_PIPELINE_MAPS[map_name] = {
         "merge_definitions": deepcopy(merge_definitions),
         "merge_pipe_inputs": deepcopy(merge_pipe_inputs),
+        "selected_plant_indexes": [int(idx) for idx in (selected_plant_indexes or [])],
         "storage_name": (storage_name or "Storage").strip() or "Storage",
         "node_positions": deepcopy(node_positions) if node_positions else {},
     }
@@ -194,6 +196,11 @@ def apply_dev_pipeline_map(map_name: str | None = None) -> None:
     selected_map = available_maps[selected_name]
     input_config = deepcopy(get_input_config())
     input_config["merge_definitions"] = deepcopy(selected_map["merge_definitions"])
+    selected_plant_indexes = [
+        int(idx)
+        for idx in (selected_map.get("selected_plant_indexes") or [])
+        if isinstance(idx, int) or (isinstance(idx, str) and idx.isdigit())
+    ]
 
     # Start with the stored dev map pipe inputs, then let input_config.json override
     # any matching merge keys so that edits to the JSON file are always picked up.
@@ -202,6 +209,13 @@ def apply_dev_pipeline_map(map_name: str | None = None) -> None:
         if merge_name in merged_pipe_inputs:
             merged_pipe_inputs[merge_name] = deepcopy(json_pipe_input)
     input_config["merge_pipe_inputs"] = merged_pipe_inputs
+
+    if not input_config["merge_definitions"] and selected_plant_indexes:
+        input_config["plant_inputs"] = [
+            deepcopy(plant_input)
+            for idx, plant_input in enumerate(input_config.get("plant_inputs", []))
+            if idx in set(selected_plant_indexes)
+        ]
 
     input_config["pipeline_map_name"] = selected_name
     input_config["storage_name"] = str(selected_map.get("storage_name") or "Storage")

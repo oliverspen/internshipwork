@@ -1,4 +1,5 @@
-from backend.models.phase_envelope import service
+from backend.merge_support import calculations
+from backend.models.phase_envelope import neqsim as service
 
 
 def test_to_mole_fractions():
@@ -41,6 +42,7 @@ def test_finite_curve_pairs_keeps_only_true_index_pairs():
     assert x_pair.tolist() == [3.0]
     assert y_pair.tolist() == [30.0]
 
+
 def test_build_fluid():
     temperature_kelvin = 298.15
     pressure_bara = 10.0
@@ -55,6 +57,101 @@ def test_build_fluid():
     assert fluid.getTemperature() == 298.15
     assert fluid.getPressure() == 10.0
     assert fluid.getNumberOfComponents() == len(mole_fractions)
+
+
+def test_build_fluid_uses_water_system_when_h2o_present(monkeypatch):
+    used = {}
+
+    class FakeFluid:
+        def __init__(self, source):
+            self.source = source
+            self.components = []
+            self.mixing_rule = None
+
+        def addComponent(self, species, fraction):
+            self.components.append((species, fraction))
+
+        def setMixingRule(self, rule):
+            self.mixing_rule = rule
+
+    def fake_base_system(_t, _p):
+        used["system"] = "base"
+        return FakeFluid("base")
+
+    def fake_water_system(_t, _p):
+        used["system"] = "water"
+        return FakeFluid("water")
+
+    monkeypatch.setattr(service, "system_cls", fake_base_system)
+    monkeypatch.setattr(service, "water_system_cls", fake_water_system)
+
+    fluid = service._build_fluid(298.15, 10.0, {"CO2": 0.99999, "H2O": 0.00001})
+
+    assert used["system"] == "water"
+    assert fluid.mixing_rule == "classic"
+
+
+def test_merge_with_water_in_one_source_uses_water_system(monkeypatch):
+    input_config = {
+        "p_bara": 10.0,
+        "merge_pipe_inputs": {
+            "Merge 1": {"pipelength": 100.0, "pipediameter": 0.5},
+        },
+    }
+    monkeypatch.setattr(calculations, "get_input_config", lambda: input_config)
+
+    merge_state = calculations._build_merge_input_from_source_states(
+        [
+            {
+                "source_name": 0,
+                "temperature_kelvin": 298.15,
+                "total_massflow": 100.0,
+                "stream_phase": "gas",
+                "initial_merge_conc": {"CO2": 10.0, "H2O": 2.0},
+            },
+            {
+                "source_name": 1,
+                "temperature_kelvin": 298.15,
+                "total_massflow": 100.0,
+                "stream_phase": "gas",
+                "initial_merge_conc": {"CO2": 10.0},
+            },
+        ],
+        merge_name="Merge 1",
+    )
+
+    assert merge_state["initial_merge_conc"]["H2O"] > 0.0
+
+    used = {}
+
+    class FakeFluid:
+        def __init__(self, source):
+            self.source = source
+            self.mixing_rule = None
+
+        def addComponent(self, _species, _fraction):
+            return None
+
+        def setMixingRule(self, rule):
+            self.mixing_rule = rule
+
+    def fake_base_system(_t, _p):
+        used["system"] = "base"
+        return FakeFluid("base")
+
+    def fake_water_system(_t, _p):
+        used["system"] = "water"
+        return FakeFluid("water")
+
+    monkeypatch.setattr(service, "system_cls", fake_base_system)
+    monkeypatch.setattr(service, "water_system_cls", fake_water_system)
+
+    mole_fractions = service._to_mole_fractions(merge_state)
+    fluid = service._build_fluid(merge_state["temperature_kelvin"], 10.0, mole_fractions)
+
+    assert mole_fractions["H2O"] > 0.0
+    assert used["system"] == "water"
+    assert fluid.mixing_rule == "classic"
 
 
 def test_build_storage_state_weighted_mix_from_plants_arrange_act_assert():
@@ -132,6 +229,7 @@ def test_build_storage_state_uses_only_terminal_merges_arrange_act_assert():
     assert result["temperature_kelvin"] == 330.0
     assert result["density_kg_per_m3"] == 3.0
     assert result["stream_phase"] == "gas"
+
 
 def test_plot_single_node_phase_envelope_output(tmp_path, monkeypatch):
     class FakeOperations:
@@ -239,6 +337,7 @@ def test_plot_single_node_phase_envelope_handles_non_finite_arrays(tmp_path, mon
     assert output_path.exists()
     assert output_path.suffix == ".png"
 
+
 def test_skips_plot_failures(capsys, tmp_path, monkeypatch):
     source_rows = [
         ("plant", 0, {"initial_merge_conc": {"CO2": 1.0}, "temperature_kelvin": 300.0}),
@@ -266,7 +365,3 @@ def test_skips_plot_failures(capsys, tmp_path, monkeypatch):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
-
-
-
-

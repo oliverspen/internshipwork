@@ -17,7 +17,7 @@ from backend.user_inputs import (
     set_runtime_input_config,
 )
 from backend.pipemapping.dev_pipeline_map import _all_dev_pipeline_maps
-from backend.models.phase_envelope.runtime import generate_phase_envelopes_from_config
+from backend.models.phase_envelope.from_config import generate_phase_envelopes_from_config
 
 router = APIRouter()
 

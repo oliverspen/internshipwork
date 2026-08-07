@@ -1,4 +1,4 @@
-"""Excel export for TOCOMO results."""
+
 
 import re
 from pathlib import Path
@@ -8,19 +8,19 @@ import pandas as pd
 
 from .utils import build_excel_rows, build_storage_row, _round_conc
 
-# Excel forbids these characters in sheet names
+
 _EXCEL_FORBIDDEN = re.compile(r'[\[\]:*?/\\]')
 
 
 def _safe_sheet_name(prefix: str, name: str) -> str:
-    """Build an Excel sheet name with forbidden chars removed, max 31 chars."""
+    
     sanitized = _EXCEL_FORBIDDEN.sub('_', f"{prefix}{name}")
     return sanitized[:31]
 from backend.user_inputs import get_input_config
 
 
 def _with_model_column(df: pd.DataFrame, model_used: str | None) -> pd.DataFrame:
-    """Ensure exported tables include a model column for traceability."""
+   
     model_value = (model_used or "unknown").strip() or "unknown"
     if "model" in df.columns:
         df = df.drop(columns=["model"])
@@ -33,10 +33,10 @@ def save_summary_excel(
     output_dir: Path,
     model_used: str | None = None,
 ) -> Path:
-    """Save combined results as Excel with a separate Storage Results table."""
+   
     summary_excel_path = (output_dir / "summary.xlsx").resolve()
 
-    # Split storage row out of the main results.
+    
     main_results = [r for r in results if str(r.get("source_type", "")) != "storage"]
     storage_results = [r for r in results if str(r.get("source_type", "")) == "storage"]
 
@@ -60,7 +60,7 @@ def save_summary_excel(
         main_df.to_excel(writer, sheet_name="Results", index=False, startrow=0)
 
         if not storage_df.empty:
-            # Leave a blank row gap then write the storage table.
+        
             start_row = len(main_df) + 3
             header_ws = writer.sheets["Results"]
             header_ws.cell(row=start_row, column=1, value="Storage Results")
@@ -80,22 +80,10 @@ def save_dynamic_excel(
     output_dir: Path,
     model_used: str | None = None,
 ) -> Path:
-    """Save dynamic simulation results as Excel with separate tables for each entity.
-    
-    Sheet order: Plants first, then Merges, then Storage at the end.
-    
-    Args:
-        dynamic_results: List of merge result dicts from simulation
-        plant_results: List of plant result dicts from simulation
-        output_dir: Directory to save Excel file
-    
-    Returns:
-        Path to saved Excel file
-    """
     excel_path = (output_dir / "dynamic_results.xlsx").resolve()
 
     with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-        # 1. Write storage sheet first with simulation time_days aligned to plant/merge sheets.
+      
         if dynamic_results:
             merge_table = pd.DataFrame(dynamic_results)
             merge_names_set = set(merge_table["merge_name"].astype(str).unique())
@@ -120,7 +108,7 @@ def save_dynamic_excel(
                         "stream_phase": result.get("stream_phase"),
                         "density_kg_per_m3": result.get("density_kg_per_m3"),
                     }
-                    # Add final contaminant concentrations from the merge
+                   
                     final_dict = result.get("final", {})
                     if isinstance(final_dict, dict):
                         for species, value in sorted(final_dict.items()):
@@ -131,7 +119,7 @@ def save_dynamic_excel(
                     storage_df = pd.DataFrame(storage_data).sort_values("time_days")
                     storage_df.to_excel(writer, sheet_name="Storage", index=False)
 
-        # 2. Write separate table for each plant
+        
         if plant_results:
             plant_names = sorted(set(r.get("plant_name") for r in plant_results if r.get("plant_name")))
 
@@ -151,7 +139,7 @@ def save_dynamic_excel(
                     for key, value in sorted(result.items()):
                         if key.startswith("inlet_"):
                             row[key] = _round_conc(value)
-                    # Include final contaminant concentrations if available
+                   
                     final_dict = result.get("final", {})
                     if isinstance(final_dict, dict):
                         for species, value in sorted(final_dict.items()):
@@ -161,7 +149,7 @@ def save_dynamic_excel(
                 sheet_name = _safe_sheet_name('Plant_', str(plant_name))
                 plant_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-        # 3. Write separate table for each merge
+
         if dynamic_results:
             merge_names = sorted(set(r.get("merge_name") for r in dynamic_results if r.get("merge_name")))
 
@@ -178,11 +166,11 @@ def save_dynamic_excel(
                         "stream_phase": result.get("stream_phase"),
                         "density_kg_per_m3": result.get("density_kg_per_m3"),
                     }
-                    # Add inlet contaminant concentrations
+            
                     for key, value in sorted(result.items()):
                         if key.startswith("inlet_"):
                             row[key] = _round_conc(value)
-                    # Add final contaminant concentrations
+              
                     final_dict = result.get("final", {})
                     if isinstance(final_dict, dict):
                         for species, value in sorted(final_dict.items()):

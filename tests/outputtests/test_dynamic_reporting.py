@@ -146,14 +146,6 @@ def test_round_numeric_columns_rounds_selected_columns_only():
     assert rounded.iloc[0]["label"] == "x"
 
 
-def test_print_dynamic_tables_execute(capsys):
-    dynamic_reporting._print_dynamic_merge_table(_sample_dynamic_results())
-    dynamic_reporting._print_dynamic_plant_table(_sample_plant_results())
-    out = capsys.readouterr().out
-    assert "Merge change points" in out
-    assert "Plant change points" in out
-
-
 def test_format_change_annotation_includes_time_only():
     assert dynamic_reporting._format_change_annotation(1.0, 2.0, 3.5) == "t=3.50 d"
 

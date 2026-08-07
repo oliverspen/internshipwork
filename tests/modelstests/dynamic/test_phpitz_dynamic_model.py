@@ -22,14 +22,14 @@ def _redirect_module_file(monkeypatch, module, tmp_path: Path) -> None:
 def test_evaluate_phpitz_merge_includes_no_and_normalizes_output(monkeypatch):
     captured: dict[str, object] = {}
 
-    def _fake_post_model(model_id, input_concentrations, *, temperature_kelvin, pressure_bara):
+    def _fake_run_model(model_id, input_concentrations, *, temperature_kelvin, pressure_bara):
         captured["model_id"] = model_id
         captured["input_concentrations"] = dict(input_concentrations)
         captured["temperature_kelvin"] = temperature_kelvin
         captured["pressure_bara"] = pressure_bara
         return {"SO2": 3.0, "NO": 4.0}
 
-    monkeypatch.setattr(phpitz_dynamic_model, "post_model", _fake_post_model)
+    monkeypatch.setattr(phpitz_dynamic_model, "run_model_with_fallback", _fake_run_model)
     monkeypatch.setattr(phpitz_dynamic_model, "get_input_config", lambda: {"p_bara": 8.0})
 
     result = phpitz_dynamic_model._evaluate_phpitz_merge(

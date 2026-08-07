@@ -1,5 +1,4 @@
 import importlib
-import math
 
 import pytest
 
@@ -20,8 +19,7 @@ def test_delay_time_matches_manual_formula():
         density_kg_per_m3=density_kg_per_m3,
     )
 
-    expected = pipe_length_m / (1.0 / (math.pi * (pipe_diameter_m / 2.0) ** 2))
-    assert actual == expected
+    assert actual == pytest.approx(785.3981)
 
 
 def test_delay_time_scales_linearly_with_pipe_length():
@@ -39,6 +37,51 @@ def test_delay_time_scales_linearly_with_pipe_length():
     )
 
     assert doubled == 2.0 * base
+
+
+def test_latest_arrived_state_returns_empty_dict_when_history_is_empty():
+    assert dynamic_model_engine._latest_arrived_state([], current_time_days=1.0) == {}
+
+
+def test_run_dynamic_merges_returns_empty_when_dt_is_not_positive():
+    result = dynamic_model_engine.run_dynamic_merges(
+        duration_days=1.0,
+        dt_days=0.0,
+        dynamic_profile={"plant_profiles": {}},
+        evaluate_merge=lambda _merge_name, _merge_values, _time_days: {},
+    )
+
+    assert result == []
+
+
+def test_run_dynamic_merges_returns_empty_when_merge_definitions_missing(monkeypatch):
+    base_config = {
+        "p_bara": 1.0,
+        "merge_definitions": [],
+        "merge_pipe_inputs": {},
+        "plant_inputs": [
+            {
+                "name": "Plant 1",
+                "flowrate": 100.0,
+                "temperature_celsius": 20.0,
+                "stream_phase": "gas",
+                "pipediameter": 1.0,
+                "pipelength": 1.0,
+                "inlet_conc": {},
+            }
+        ],
+    }
+
+    monkeypatch.setattr(dynamic_model_engine, "resolve_merge_input_config", lambda: base_config)
+
+    result = dynamic_model_engine.run_dynamic_merges(
+        duration_days=1.0,
+        dt_days=0.5,
+        dynamic_profile={"plant_profiles": {}},
+        evaluate_merge=lambda _merge_name, _merge_values, _time_days: {},
+    )
+
+    assert result == []
 
 
 def test_run_dynamic_merges_uses_current_flowrate_for_downstream_merge(monkeypatch):

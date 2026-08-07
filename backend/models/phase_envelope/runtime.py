@@ -1,5 +1,3 @@
-"""Runtime helpers to generate phase envelopes from active pipeline config."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,7 +41,7 @@ def generate_phase_envelopes_from_config(
     config: dict[str, Any],
     output_dir: Path,
 ) -> list[Path]:
-    """Generate phase envelopes for plant, merge, and storage nodes."""
+    """Generate phase envelopes for plant and merge nodes."""
     found = {
         str(species).upper()
         for plant in config.get("plant_inputs", [])

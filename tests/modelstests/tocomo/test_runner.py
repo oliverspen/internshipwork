@@ -143,3 +143,52 @@ def test_run_reaction_saves_output_pipeline(monkeypatch):
     assert captured["node_types"] == {"Storage": "storage"}
     assert captured["plant_names"] == {0: "Plant 1"}
     assert captured["results_len"] == 2
+
+
+def test_run_reaction_acidwatch_values(monkeypatch):
+    source_row = (
+        "plant",
+        0,
+        {
+            "stream_phase": "gas",
+            "density_kg_per_m3": 2.0,
+            "temperature_kelvin": 315.0,
+            "total_massflow": 5.0,
+        },
+    )
+    config = {
+        "p_bara": 12.5,
+        "merge_definitions": [],
+        "storage_name": "Storage",
+        "plant_inputs": [{"name": "Plant 1"}],
+    }
+
+    tocomo_input = {"O2": 1, "H2O": 2, "H2S": 3, "SO2": 4, "NO2": 5}
+    expected_final = {"O2": 0, "H2O": 4.33, "H2S": 0.67, "SO2": 6.33, "NO2": 0, "NO": 5.00}
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(tocomo_runner, "source_results_for_tocomo", lambda: [source_row])
+    monkeypatch.setattr(tocomo_runner, "to_tocomo_input_from_source_state", lambda _state: tocomo_input)
+
+    def fake_run_model(model_id, input_concentrations, **kwargs):
+        captured["model_id"] = model_id
+        captured["input_concentrations"] = input_concentrations
+        captured["kwargs"] = kwargs
+        return expected_final
+
+    monkeypatch.setattr(tocomo_runner, "run_model_with_fallback", fake_run_model)
+    monkeypatch.setattr(tocomo_runner, "get_input_config", lambda: config)
+    monkeypatch.setattr(tocomo_runner, "build_storage_row", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        tocomo_runner,
+        "build_graph_from_merge_definitions",
+        lambda *args, **kwargs: ("graph", {"Storage": "storage"}),
+    )
+    monkeypatch.setattr(tocomo_runner, "save_tocomo_results", lambda *args, **kwargs: None)
+
+    results = tocomo_runner.run_reaction()
+
+    assert results[0]["final"] == expected_final
+    assert captured["model_id"] == "tocomo"
+    assert captured["input_concentrations"] == tocomo_input
+    assert captured["kwargs"] == {"temperature_kelvin": 315.0, "pressure_bara": 12.5}

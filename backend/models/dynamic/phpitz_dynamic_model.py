@@ -1,14 +1,3 @@
-"""PH_PITZ dynamic model wrapper for time-stepping simulations.
-
-Wraps the generic dynamic merge simulation engine (dynamic_model_engine) with a
-PH_PITZ chemistry evaluator to run equilibrium calculations at each time step with
-time-varying inlet stream conditions.
-
-Main entry point: run_reaction_dynamic() orchestrates the entire simulation workflow
-including plant state collection, merge property calculation, PH_PITZ API evaluation,
-and report generation.
-"""
-
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -25,17 +14,6 @@ def _evaluate_phpitz_plant(
     plant_values: dict[str, Any],
     time_days: float,
 ) -> dict[str, Any]:
-    """Call PH_PITZ API to evaluate chemistry for a plant inlet stream.
-    
-    Args:
-        plant_name: Name of the plant (for logging).
-        plant_values: Plant state dict with inlet_* concentration keys.
-        time_days: Current simulation time in days.
-    
-    Returns:
-        Dict with keys 'phpitz_input' (input concentrations sent to API) and
-        'final' (equilibrium concentrations returned by PH_PITZ).
-    """
     # Extract inlet concentrations from plant values.
     input_concentrations = {
         "H2O": plant_values.get("inlet_H2O", 0),
@@ -74,17 +52,6 @@ def _evaluate_phpitz_merge(
     merge_values: dict[str, Any],
     _time_days: float,
 ) -> dict[str, Any]:
-    """Call PH_PITZ API to evaluate chemistry at a merge node.
-    
-    Args:
-        merge_name: Name of the merge node (for logging).
-        merge_values: Merge state dict with ppm_molar concentrations.
-        _time_days: Current simulation time in days (unused, for callback compatibility).
-    
-    Returns:
-        Dict with keys 'phpitz_input' (input concentrations sent to API) and
-        'final' (equilibrium concentrations returned by PH_PITZ).
-    """
     # Convert from internal representation to capitalized species names matching AcidWatch.
     input_concentrations = {
         "H2O": merge_values["ppm_molar"].get("H2O", 0),
@@ -124,23 +91,7 @@ def run_reaction_dynamic(
     dynamic_profile: dict[str, object],
     progress_callback: Callable[[int, int, str | None], None] | None = None,
 ) -> list[dict]:
-    """Run PH_PITZ as a dynamic model with time-varying stream inputs.
-    
-    Orchestrates a time-stepping simulation where:
-    1. Inlet conditions vary according to dynamic_profile
-    2. At each time step, merges are calculated with transport delays
-    3. PH_PITZ API evaluates equilibrium concentrations at each merge
-    4. Results are collected for plant states and merge states
-    5. Summary reports (graphs, tables) are generated and saved to results/phpitz_dynamic/{timestamp}
-    
-    Args:
-        duration_days: Simulation duration in days, or None to auto-derive from pipe times.
-        dt_days: Time step size in days.
-        dynamic_profile: Dict with 'plant_profiles' specifying time-varying inlet conditions.
-    
-    Returns:
-        List of merge result dicts (one per time_step, merge_name) with PH_PITZ outputs.
-    """
+
     # Create results/phpitz_dynamic/{timestamp} folder
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = (Path(__file__).resolve().parents[3] / "results" / "phpitz_dynamic").resolve()
@@ -209,8 +160,5 @@ def run_reaction_dynamic(
 
     if progress_callback is not None:
         progress_callback(99, 100, "Finalizing outputs")
-    
-    print(f"Dynamic PH_PITZ results saved to: {session_dir}")
-    print(f"  - Graph: {graph_output_path}")
-    print(f"  - Excel: {excel_path}")
+
     return dynamic_results

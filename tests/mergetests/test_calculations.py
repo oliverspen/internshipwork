@@ -131,7 +131,7 @@ def test_build_plant_source_dict(monkeypatch: pytest.MonkeyPatch):
     assert source_dict["ppm_molar"]["NO2"] == pytest.approx(5.0)
     assert source_dict["ppm_molar"]["CO2"] == pytest.approx(999975.0)
 
-    assert set(source_dict["initial_merge_conc"].keys()) == set(expected_initial_merge_conc.keys())
+    assert set(source_dict["initial_merge_conc"].keys()) == set(SPECIES_ORDER)
     for species, expected_value in expected_initial_merge_conc.items():
         assert source_dict["initial_merge_conc"][species] == pytest.approx(expected_value)
 
@@ -223,15 +223,15 @@ def test_build_merge_input_from_source_states(monkeypatch: pytest.MonkeyPatch):
     assert merge_dict["pipe_length"] == pytest.approx(100000.0)
     assert merge_dict["pipe_diameter"] == pytest.approx(0.5)
 
-    assert set(merge_dict["initial_merge_conc"].keys()) == set(expected_initial_merge_conc.keys())
+    assert set(merge_dict["initial_merge_conc"].keys()) == set(SPECIES_ORDER)
     for species, expected_value in expected_initial_merge_conc.items():
         assert merge_dict["initial_merge_conc"][species] == pytest.approx(expected_value)
 
-    assert set(merge_dict["ppm_molar"].keys()) == set(expected_ppm_molar.keys())
+    assert set(merge_dict["ppm_molar"].keys()) == set(SPECIES_ORDER)
     for species, expected_value in expected_ppm_molar.items():
         assert merge_dict["ppm_molar"][species] == pytest.approx(expected_value)
 
-    assert set(merge_dict["ppm_mass"].keys()) == set(expected_ppm_mass.keys())
+    assert set(merge_dict["ppm_mass"].keys()) == set(SPECIES_ORDER)
     for species, expected_value in expected_ppm_mass.items():
         assert merge_dict["ppm_mass"][species] == pytest.approx(expected_value)
 
@@ -324,7 +324,7 @@ def test_build_merge_input_two_sources_weighted_mix(monkeypatch: pytest.MonkeyPa
     assert merge_dict["pipe_length"] == 100000.0
     assert merge_dict["pipe_diameter"] == 0.5
 
-    assert set(merge_dict["initial_merge_conc"].keys()) == set(expected_initial_merge_conc.keys())
+    assert set(merge_dict["initial_merge_conc"].keys()) == set(SPECIES_ORDER)
     for species, expected_value in expected_initial_merge_conc.items():
         assert merge_dict["initial_merge_conc"][species] == pytest.approx(expected_value)
 

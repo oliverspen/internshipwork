@@ -1,5 +1,3 @@
-"""Simulation endpoints — starts jobs in background threads and exposes a polling endpoint."""
-
 import math
 import zipfile
 import threading

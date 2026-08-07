@@ -216,6 +216,50 @@ def test_storage_receipt_concentration_uses_fluid_delay():
     assert list(table["metric_value"]) == [7.0, 7.0]
 
 
+def test_storage_receipt_concentration_can_use_instantaneous_delay_for_flow_driven_case():
+    dynamic_results = [
+        {
+            "time_days": 2.0,
+            "merge_name": "Terminal",
+            "sources": "0",
+            "final_NO2": 7.0,
+            "pipe_time_days": 5.0,
+            "acoustic_pipe_time_days": 0.0,
+        }
+    ]
+
+    table = dynamic_reporting._build_storage_receipt_table_for_column(
+        dynamic_results,
+        value_col="final_NO2",
+        dt_days=1.0,
+        composition_instantaneous=True,
+    )
+
+    assert list(table["time_days"]) == [0.0, 2.0]
+    assert list(table["metric_value"]) == [7.0, 7.0]
+
+
+def test_use_instantaneous_storage_composition_only_for_flow_without_inlet_steps():
+    flow_only_profile = {
+        "plant_profiles": {
+            "Plant 1": {
+                "flowrate": [(1.0, 1250.0)],
+            }
+        }
+    }
+    with_inlet_step_profile = {
+        "plant_profiles": {
+            "Plant 1": {
+                "flowrate": [(1.0, 1250.0)],
+                "inlet_conc": {"SO2": [(2.0, 5.0)]},
+            }
+        }
+    }
+
+    assert dynamic_reporting._use_instantaneous_storage_composition(flow_only_profile)
+    assert not dynamic_reporting._use_instantaneous_storage_composition(with_inlet_step_profile)
+
+
 def test_build_metric_compact_tables_returns_non_empty_merge_and_storage():
     merge_compact, plant_compact, storage_compact, x_end = dynamic_reporting._build_metric_compact_tables(
         _sample_dynamic_results(),
@@ -236,6 +280,7 @@ def test_infer_all_metrics_collects_union_of_inlet_and_output_species():
     names = [m["name"] for m in metrics]
 
     assert "Flow" in names
+    assert "Temperature" in names
     assert "SO2" in names
     assert "NO2" in names
 
@@ -284,6 +329,7 @@ def test_plot_all_dynamic_dashboards_writes_graph_files(tmp_path: Path):
     assert graph_dir.exists()
     written = {path.name for path in graph_dir.glob("*.png")}
     assert "flow_graph.png" in written
+    assert "temperature_graph.png" in written
     assert "predicted_so2.png" in written
     assert "inlet_so2.png" in written
     assert "predicted_no2.png" in written

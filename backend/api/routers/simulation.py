@@ -30,6 +30,9 @@ _MODEL_FOLDERS = {
     "tocomo_dynamic": "tocomo_dynamic",
     "phpitz_dynamic": "phpitz_dynamic",
 }
+_DEFAULT_DYNAMIC_PROFILE: dict[str, Any] = {"plant_profiles": {}}
+_DEFAULT_DYNAMIC_DT_DAYS = 0.01
+_DEFAULT_DYNAMIC_DURATION_DAYS = 2.0
 
 # Simple in-memory job store; fine for a single-process dev server.
 _jobs: dict[str, dict[str, Any]] = {}
@@ -160,6 +163,7 @@ def _to_json_safe(obj: Any) -> Any:
 def _build_config_from_request(body: SimulationRequest) -> dict[str, Any]:
     """Resolve a SimulationRequest into a validated runtime config dict."""
     base = get_input_config()
+    selected_plant_indexes: list[int] = []
 
     if body.map_name:
         all_maps = _all_dev_pipeline_maps()
@@ -168,6 +172,7 @@ def _build_config_from_request(body: SimulationRequest) -> dict[str, Any]:
         stored = all_maps[body.map_name]
         merge_definitions = stored["merge_definitions"]
         merge_pipe_inputs = stored["merge_pipe_inputs"]
+        selected_plant_indexes = [int(idx) for idx in (stored.get("selected_plant_indexes") or [])]
         storage_name = str(stored.get("storage_name") or base.get("storage_name") or "Storage")
     elif body.pipeline_map:
         merge_definitions = [
@@ -182,6 +187,7 @@ def _build_config_from_request(body: SimulationRequest) -> dict[str, Any]:
             name: inp.model_dump()
             for name, inp in body.pipeline_map.merge_pipe_inputs.items()
         }
+        selected_plant_indexes = [int(idx) for idx in (body.pipeline_map.selected_plant_indexes or [])]
         storage_name = str(body.pipeline_map.storage_name or base.get("storage_name") or "Storage")
     else:
         raise HTTPException(422, "Provide either map_name or pipeline_map.")
@@ -191,6 +197,13 @@ def _build_config_from_request(body: SimulationRequest) -> dict[str, Any]:
         if body.plant_inputs
         else base["plant_inputs"]
     )
+    if not merge_definitions and selected_plant_indexes:
+        selected_index_set = set(selected_plant_indexes)
+        plant_inputs = [
+            plant_input
+            for idx, plant_input in enumerate(plant_inputs)
+            if idx in selected_index_set
+        ]
     p_bara = body.p_bara if body.p_bara is not None else float(base["p_bara"])
 
     config = build_input_config(
@@ -240,24 +253,26 @@ def _run_job(
                 progress_callback=_update_progress,
             )
         elif model == "tocomo_dynamic":
-            from backend.models.dynamic.runner import DURATION_DAYS, DT_DAYS, DYNAMIC_PROFILE
             from backend.models.dynamic.tocomo_dynamic_model import run_reaction_dynamic
 
-            selected_profile = dynamic_profile if dynamic_profile else DYNAMIC_PROFILE
+            selected_profile = dynamic_profile if dynamic_profile else _DEFAULT_DYNAMIC_PROFILE
             results = run_reaction_dynamic(
-                duration_days=duration_days if duration_days is not None else DURATION_DAYS,
-                dt_days=dt_days if dt_days is not None else DT_DAYS,
+                duration_days=(
+                    duration_days if duration_days is not None else _DEFAULT_DYNAMIC_DURATION_DAYS
+                ),
+                dt_days=dt_days if dt_days is not None else _DEFAULT_DYNAMIC_DT_DAYS,
                 dynamic_profile=selected_profile,
                 progress_callback=_update_progress,
             )
         elif model == "phpitz_dynamic":
-            from backend.models.dynamic.runner import DURATION_DAYS, DT_DAYS, DYNAMIC_PROFILE
             from backend.models.dynamic.phpitz_dynamic_model import run_reaction_dynamic
 
-            selected_profile = dynamic_profile if dynamic_profile else DYNAMIC_PROFILE
+            selected_profile = dynamic_profile if dynamic_profile else _DEFAULT_DYNAMIC_PROFILE
             results = run_reaction_dynamic(
-                duration_days=duration_days if duration_days is not None else DURATION_DAYS,
-                dt_days=dt_days if dt_days is not None else DT_DAYS,
+                duration_days=(
+                    duration_days if duration_days is not None else _DEFAULT_DYNAMIC_DURATION_DAYS
+                ),
+                dt_days=dt_days if dt_days is not None else _DEFAULT_DYNAMIC_DT_DAYS,
                 dynamic_profile=selected_profile,
                 progress_callback=_update_progress,
             )

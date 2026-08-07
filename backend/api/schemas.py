@@ -33,6 +33,7 @@ class NodePosition(BaseModel):
 class PipelineMap(BaseModel):
     merge_definitions: list[MergeDefinition]
     merge_pipe_inputs: dict[str, MergePipeInput]
+    selected_plant_indexes: list[int] | None = None
     storage_name: str | None = "Storage"
     node_positions: dict[str, NodePosition] | None = None
 

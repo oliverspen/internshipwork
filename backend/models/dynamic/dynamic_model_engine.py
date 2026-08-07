@@ -20,6 +20,8 @@ merge and returns a list of results indexed by (time_step, merge_name).
 from copy import deepcopy
 from typing import Any, Callable
 
+import numpy as np
+
 from backend.merge_support import build_merge_inputs_from_definitions
 from backend.merge_support.calculations import _build_merge_input_from_source_states, _build_plant_source_dict
 from backend.pipemapping.workflow import build_pipe_graph_with_inputs_interactive
@@ -29,6 +31,20 @@ from backend.user_inputs import clear_runtime_input_config, get_input_config, se
 # Type alias for merge evaluation callback: (merge_name, merge_values, time_days) -> extra_columns_dict
 MergeEvaluator = Callable[[str, dict[str, Any], float], dict[str, Any]]
 SECONDS_PER_DAY = 86400.0
+
+
+def delay_time_s(
+    pipe_length_m: float,
+    flowrate_kg_per_h: float,
+    pipe_diameter_m: float,
+    density_kg_per_m3: float,
+) -> float:
+    """Return fluid transport delay time through a pipe in seconds."""
+    flow_rate_kg_per_s = flowrate_kg_per_h / 3600.0
+    volumetric_flow_rate_m3_per_s = flow_rate_kg_per_s / density_kg_per_m3
+    pipe_area_m2 = np.pi * (pipe_diameter_m / 2.0) ** 2
+    flow_speed_m_per_s = volumetric_flow_rate_m3_per_s / pipe_area_m2
+    return pipe_length_m / flow_speed_m_per_s
 
 
 def _step_hold_value(time_days: float, points: list[tuple[float, float]], default_value: float) -> float:

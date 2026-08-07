@@ -4,9 +4,7 @@ import pytest
 
 
 MODULES = [
-    "backend.models.dynamic.delay",
     "backend.models.dynamic.phpitz_dynamic_model",
-    "backend.models.dynamic.runner",
     "backend.models.dynamic.tocomo_dynamic_model",
     "backend.models.phpitz_reactive.pipeline",
     "backend.models.phpitz_reactive.runner",

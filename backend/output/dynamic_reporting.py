@@ -566,10 +566,57 @@ def _ensure_merge_metric_column(merge_table: pd.DataFrame, value_col: str) -> pd
     return resolved
 
 
+def _dynamic_profile_has_flow_changes(dynamic_profile: dict[str, object]) -> bool:
+    """Return True when any plant profile defines at least one flowrate change point."""
+    plant_profiles = dynamic_profile.get("plant_profiles", {})
+    if not isinstance(plant_profiles, dict):
+        return False
+
+    for plant_profile in plant_profiles.values():
+        if not isinstance(plant_profile, dict):
+            continue
+        flow_points = plant_profile.get("flowrate", [])
+        if isinstance(flow_points, list) and len(flow_points) > 0:
+            return True
+    return False
+
+
+def _dynamic_profile_has_inlet_concentration_changes(dynamic_profile: dict[str, object]) -> bool:
+    """Return True when any plant profile defines inlet concentration change points."""
+    plant_profiles = dynamic_profile.get("plant_profiles", {})
+    if not isinstance(plant_profiles, dict):
+        return False
+
+    for plant_profile in plant_profiles.values():
+        if not isinstance(plant_profile, dict):
+            continue
+        inlet_profile = plant_profile.get("inlet_conc", {})
+        if not isinstance(inlet_profile, dict):
+            continue
+        for points in inlet_profile.values():
+            if isinstance(points, list) and len(points) > 0:
+                return True
+    return False
+
+
+def _use_instantaneous_storage_composition(dynamic_profile: dict[str, object]) -> bool:
+    """Use instantaneous storage composition timing for flow-driven scenarios.
+
+    When concentration changes are induced by flowrate updates (and there are no
+    explicit inlet concentration step changes), align storage timing with the
+    model's instantaneous flow propagation assumption.
+    """
+    return (
+        _dynamic_profile_has_flow_changes(dynamic_profile)
+        and not _dynamic_profile_has_inlet_concentration_changes(dynamic_profile)
+    )
+
+
 def _build_storage_receipt_table_for_column(
     dynamic_results: list[dict[str, Any]],
     value_col: str,
     dt_days: float = 0.1,
+    composition_instantaneous: bool = False,
 ) -> pd.DataFrame:
     """Build storage receipt rows for a selected merge output column, snapped to next dt step.
 
@@ -603,8 +650,13 @@ def _build_storage_receipt_table_for_column(
         errors="coerce",
     ).fillna(0.0)
 
-    # Flowrate changes are instantaneous; species concentrations follow fluid residence time.
-    delay_days_col = "acoustic_pipe_time_days" if value_col == "flow_kg_per_h" else "pipe_time_days"
+    # Flowrate changes are instantaneous. For composition metrics we can also use
+    # instantaneous timing in flow-driven scenarios where inlet concentrations are
+    # not explicitly being stepped.
+    use_instantaneous = value_col == "flow_kg_per_h" or (
+        composition_instantaneous and value_col.startswith("final_")
+    )
+    delay_days_col = "acoustic_pipe_time_days" if use_instantaneous else "pipe_time_days"
     raw_arrival_time = (
         pd.to_numeric(terminal_rows["time_days"], errors="coerce")
         + terminal_rows[delay_days_col]
@@ -820,6 +872,7 @@ def _build_metric_compact_tables(
     merge_value_col: str,
     plant_value_col: str,
     storage_value_col: str,
+    composition_instantaneous: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, float]:
     """Prepare compact merge/plant/storage tables for one metric."""
     merge_table = _ensure_merge_metric_column(pd.DataFrame(dynamic_results), merge_value_col)
@@ -851,7 +904,10 @@ def _build_metric_compact_tables(
             )
 
     storage_table = _build_storage_receipt_table_for_column(
-        dynamic_results, storage_value_col, dt_days=_infer_dt_days(dynamic_results)
+        dynamic_results,
+        storage_value_col,
+        dt_days=_infer_dt_days(dynamic_results),
+        composition_instantaneous=composition_instantaneous,
     )
     storage_compact = pd.DataFrame()
     if not storage_table.empty:
@@ -897,6 +953,21 @@ def _infer_all_metrics(
             "y_label": "Flow (kg/h)",
         }
     )
+
+    # Include temperature when present in simulation outputs.
+    has_temperature = any("temperature_celsius" in row for row in dynamic_results) or any(
+        "temperature_celsius" in row for row in plant_results
+    )
+    if has_temperature:
+        metrics.append(
+            {
+                "name": "Temperature",
+                "merge_col": "temperature_celsius",
+                "plant_col": "temperature_celsius",
+                "storage_col": "temperature_celsius",
+                "y_label": "Temperature (C)",
+            }
+        )
 
     # Collect all output species from "final" dicts in merge results
     output_species: set[str] = set()
@@ -1013,6 +1084,7 @@ def plot_all_dynamic_dashboards(
     graph_dir = output_base.parent / "graphs"
     graph_dir.mkdir(parents=True, exist_ok=True)
     saved_paths = []
+    composition_instantaneous = _use_instantaneous_storage_composition(dynamic_profile)
 
     for metric in metrics:
         merge_compact, plant_compact, storage_compact, x_end = _build_metric_compact_tables(
@@ -1021,6 +1093,7 @@ def plot_all_dynamic_dashboards(
             merge_value_col=metric["merge_col"],
             plant_value_col=metric["plant_col"],
             storage_value_col=metric["storage_col"],
+            composition_instantaneous=composition_instantaneous,
         )
 
         fig, axes = plt.subplots(3, 1, figsize=(15, 11.7), sharex=True)
@@ -1083,6 +1156,8 @@ def plot_all_dynamic_dashboards(
         # Save one or more files per metric in graphs/ subfolder with species grouping.
         if metric["name"] == "Flow":
             file_names = ["flow_graph.png"]
+        elif metric["name"] == "Temperature":
+            file_names = ["temperature_graph.png"]
         else:
             species = str(metric["name"]).strip().upper()
             safe_species = species.lower().replace(" ", "_")

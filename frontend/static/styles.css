@@ -167,22 +167,27 @@ select:focus { outline: none; border-color: #3182ce; background: white; }
   padding: .45rem .4rem; border-bottom: 1px solid #f7fafc; font-size: .88rem;
 }
 .map-item:last-child { border-bottom: none; }
-.map-item-select {
+.map-item-details {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: .1rem;
-  background: transparent;
-  border: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
   padding: .1rem 0;
 }
-.map-item-select:hover .map-item-name { color: #1a365d; }
 .map-item-name { font-size: .88rem; font-weight: 600; }
 .map-item-meta { font-size: .74rem; color: var(--ui-muted); }
+.map-item-actions {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+.map-item-pick { flex: 0 0 auto; background: #ebf8ff; color: #2b6cb0; }
+.map-item-pick:hover { background: #bee3f8; }
+.map-item-pick.is-active {
+  background: #2b6cb0;
+  color: #fff;
+}
 .map-item-delete { flex: 0 0 auto; background: #fff5f5; color: #c53030; }
 .map-item-delete:hover { background: #fed7d7; }
 .map-merges { font-size: .75rem; color: var(--ui-muted); margin-top: .15rem; }
@@ -194,6 +199,10 @@ select:focus { outline: none; border-color: #3182ce; background: white; }
   background: #fff;
   max-height: 220px;
   overflow: auto;
+}
+
+.run-btn-spaced {
+  margin-top: .9rem;
 }
 
 .session-item { padding: .45rem 0; border-bottom: 1px solid #f7fafc; font-size: .83rem; }

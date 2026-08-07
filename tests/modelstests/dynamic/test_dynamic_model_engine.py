@@ -1,9 +1,44 @@
 import importlib
+import math
 
 import pytest
 
 
 dynamic_model_engine = importlib.import_module("backend.models.dynamic.dynamic_model_engine")
+
+
+def test_delay_time_matches_manual_formula():
+    pipe_length_m = 1000.0
+    flowrate_kg_per_h = 3600.0
+    pipe_diameter_m = 1.0
+    density_kg_per_m3 = 1.0
+
+    actual = dynamic_model_engine.delay_time_s(
+        pipe_length_m=pipe_length_m,
+        flowrate_kg_per_h=flowrate_kg_per_h,
+        pipe_diameter_m=pipe_diameter_m,
+        density_kg_per_m3=density_kg_per_m3,
+    )
+
+    expected = pipe_length_m / (1.0 / (math.pi * (pipe_diameter_m / 2.0) ** 2))
+    assert actual == expected
+
+
+def test_delay_time_scales_linearly_with_pipe_length():
+    base = dynamic_model_engine.delay_time_s(
+        pipe_length_m=100.0,
+        flowrate_kg_per_h=5000.0,
+        pipe_diameter_m=0.4,
+        density_kg_per_m3=2.0,
+    )
+    doubled = dynamic_model_engine.delay_time_s(
+        pipe_length_m=200.0,
+        flowrate_kg_per_h=5000.0,
+        pipe_diameter_m=0.4,
+        density_kg_per_m3=2.0,
+    )
+
+    assert doubled == 2.0 * base
 
 
 def test_run_dynamic_merges_uses_current_flowrate_for_downstream_merge(monkeypatch):

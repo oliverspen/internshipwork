@@ -2,15 +2,24 @@
 
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
+  const contentType = String(res.headers.get('content-type') || '').toLowerCase();
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(_extractApiErrorMessage(body, res.statusText));
+    const rawText = await res.text().catch(() => '');
+    let body = null;
+    if (rawText && contentType.includes('application/json')) {
+      try {
+        body = JSON.parse(rawText);
+      } catch {
+        body = null;
+      }
+    }
+    const fallback = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}`.trim();
+    throw new Error(_extractApiErrorMessage(body, fallback, rawText));
   }
 
   // Some successful endpoints intentionally return no body (e.g., 204 delete).
   if (res.status === 204 || res.status === 205) return null;
 
-  const contentType = String(res.headers.get('content-type') || '').toLowerCase();
   if (contentType.includes('application/json')) {
     return res.json();
   }
@@ -52,7 +61,7 @@ async function _loadMapAndConfigWithRetry(mapName, maxRetries = 2) {
   }
 }
 
-function _extractApiErrorMessage(body, fallback = 'Request failed') {
+function _extractApiErrorMessage(body, fallback = 'Request failed', rawText = '') {
   if (!body || typeof body !== 'object') return String(fallback || 'Request failed');
 
   const detail = body.detail;
@@ -82,6 +91,12 @@ function _extractApiErrorMessage(body, fallback = 'Request failed') {
     } catch {
       return String(fallback || 'Request failed');
     }
+  }
+
+  const trimmedText = String(rawText || '').replace(/\s+/g, ' ').trim();
+  if (trimmedText) {
+    const noTags = trimmedText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (noTags) return `${String(fallback || 'Request failed')}: ${noTags.slice(0, 220)}`;
   }
 
   return String(fallback || 'Request failed');

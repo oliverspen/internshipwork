@@ -15,6 +15,7 @@ import numpy as np
 
 from neqsim import jneqsim
 system_cls = jneqsim.thermo.system.SystemSrkEos
+water_system_cls = getattr(jneqsim.thermo.system, "SystemSrkCPAstatoil", None)
 operations_cls = jneqsim.thermodynamicoperations.ThermodynamicOperations
 
 
@@ -40,7 +41,9 @@ def _to_mole_fractions(source_conc: dict[str, Any]) -> dict[str, float]:
 
 
 def _build_fluid(temperature_kelvin: float, pressure_bara: float, mole_fractions: dict[str, float]):
-    fluid = system_cls(temperature_kelvin, pressure_bara)
+    has_water = float(mole_fractions.get("H2O", 0.0) or 0.0) > 0.0
+    selected_system_cls = water_system_cls if has_water and water_system_cls is not None else system_cls
+    fluid = selected_system_cls(temperature_kelvin, pressure_bara)
     for species, fraction in mole_fractions.items():
         if fraction <= 0:
             continue
@@ -137,7 +140,7 @@ def _plot_single_node_phase_envelope(
     fig.patch.set_facecolor("#f7f9fc")
     ax.set_facecolor("#ffffff")
 
-    dew_line, = ax.plot(
+    ax.plot(
         dew_t_plot,
         dew_p_plot,
         color="#136fdb",
@@ -151,7 +154,7 @@ def _plot_single_node_phase_envelope(
         markersize=2.6,
         markevery=2,
     )
-    bubble_line, = ax.plot(
+    ax.plot(
         bub_t_plot,
         bub_p_plot,
         color="#f97316",

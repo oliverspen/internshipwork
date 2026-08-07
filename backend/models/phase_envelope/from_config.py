@@ -6,7 +6,7 @@ from typing import Any
 from backend.merge_support.calculations import _build_plant_source_dict
 from backend.merge_support.flow import build_merge_inputs_from_definitions
 
-from .service import _NEQSIM_UNSUPPORTED, generate_phase_envelopes_for_network
+from .neqsim import _NEQSIM_UNSUPPORTED, generate_phase_envelopes_for_network
 
 
 def build_source_rows_from_config(

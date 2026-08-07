@@ -342,4 +342,4 @@ def test_run_dynamic_merges_temperature_uses_pipe_delay(monkeypatch):
     )
 
     # With 1-day pipe delay: t=0 -> 20C, t=1 still sees t=0, t=2 sees t=1.
-    assert [row["temperature_celsius"] for row in results] == pytest.approx([20.15, 20.15, 80.15])
+    assert [row["temperature_celsius"] for row in results] == [20.15, 20.15, 80.15]
